@@ -39,13 +39,20 @@ class SpeedDataset(Dataset):
 # Model Definition: PoseNet Variant
 # ----------------------------
 class PoseNet(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self, pretrained=True, freeze_early_layers=True):
         super(PoseNet, self).__init__()
         # Use ResNet-50 as backbone
         self.backbone = models.resnet50(pretrained=pretrained)
         num_features = self.backbone.fc.in_features
         # Remove the final classification layer
         self.backbone.fc = nn.Identity()
+
+        if freeze_early_layers:
+            # Freeze initial layers: conv1, bn1, layer1
+            for name, param in self.backbone.named_parameters():
+                if name.startswith('conv1') or name.startswith('bn1') or name.startswith('layer1'):
+                    param.requires_grad = False
+            print("Froze ResNet layers: conv1, bn1, layer1")
         
         # Separate fully connected layers for rotation (quaternion) and translation
         self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
@@ -111,23 +118,38 @@ def main(args):
     print(f"Using device: {device}")
     
     # Define image transformations
-    transform = transforms.Compose([
+    # Augmentations for the training set
+    train_transform = transforms.Compose([
+        transforms.Resize((224, 224)), # Resize directly to final size
+        # Removed RandomCrop and RandomRotation as they invalidate pose labels without adjustment
+        transforms.ColorJitter(brightness=0.05, contrast=0.05, saturation=0.05, hue=0.0), # Reduced color jitter for space imaging
+        transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)), # Add Gaussian blur augmentation
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                             std=[0.229, 0.224, 0.225])
+    ])
+    
+    # No augmentations for the test set, only resize, tensor conversion, and normalization
+    test_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                              std=[0.229, 0.224, 0.225])
     ])
     
-    # Use paths from args
-    train_dataset = SpeedDataset(args.annotation_file, args.img_dir, transform)
-    test_dataset = SpeedDataset(args.test_annotation_file, args.test_img_dir, transform)
+    # Use paths from args and apply respective transforms
+    train_dataset = SpeedDataset(args.annotation_file, args.img_dir, train_transform)
+    test_dataset = SpeedDataset(args.test_annotation_file, args.test_img_dir, test_transform)
     
     # Use dataloader args
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     
-    model = PoseNet(pretrained=True).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    model = PoseNet(pretrained=True, freeze_early_layers=True).to(device)
+    
+    # Filter parameters to only include those that require gradients
+    params_to_optimize = filter(lambda p: p.requires_grad, model.parameters())
+    optimizer = optim.Adam(params_to_optimize, lr=args.lr)
     
     # Use num_epochs from args
     for epoch in range(args.num_epochs):
