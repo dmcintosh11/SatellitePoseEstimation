@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite Pose Estimation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Satellite Pose Estimator</h1>
+        <p>Upload an image of a satellite to predict its pose (orientation as quaternion and position as translation
+            vector).</p>
+
+        <div class="upload-section">
+            <label for="fileInput" class="file-label">Choose Satellite Image</label>
+            <input type="file" id="fileInput" accept="image/png, image/jpeg, image/jpg">
+            <button id="predictButton" disabled>Predict Pose</button>
+        </div>
+
+        <div id="status" class="status-message"></div>
+
+        <div class="results-area">
+            <div class="image-preview-container">
+                <h2>Image Preview:</h2>
+                <img id="imagePreview" src="#" alt="Image preview will appear here" style="display: none;">
+            </div>
+            <div class="prediction-container">
+                <h2>Prediction:</h2>
+                <div id="predictionResult" class="prediction-result">
+                    <p>Upload an image and click 'Predict Pose'.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

@@ -70,10 +70,32 @@ class PoseNet(nn.Module):
 # Loss Function
 # ----------------------------
 def pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=1.0):
-    # Mean Squared Error loss for both rotation and translation
-    loss_rot = nn.MSELoss()(pred_rot, true_rot)
-    loss_trans = nn.MSELoss()(pred_trans, true_trans)
-    # beta weights the translation loss relative to the rotation loss
+    # Quaternion loss using geodesic distance for rotation
+    # Normalize quaternions to ensure unit length
+    pred_rot_normalized = pred_rot / torch.norm(pred_rot, dim=1, keepdim=True)
+    true_rot_normalized = true_rot / torch.norm(true_rot, dim=1, keepdim=True)
+    
+    # Calculate dot product between predicted and true quaternions
+    dot_product = torch.sum(pred_rot_normalized * true_rot_normalized, dim=1)
+    
+    # Clamp dot product to valid range for arccos
+    dot_product = torch.clamp(dot_product, -1.0, 1.0)
+    
+    # Geodesic distance (angular distance in radians)
+    # We use 2 * arccos(|q1 · q2|) as the distance between quaternions
+    # The absolute value handles the fact that q and -q represent the same rotation
+    angular_distance = 2.0 * torch.acos(torch.abs(dot_product))
+    loss_rot = torch.mean(angular_distance ** 2)  # Squared angular distance
+    
+    # Calculate relative translation error (as percentage of distance)
+    # This is more appropriate for satellite pose estimation where distances can vary
+    true_trans_norm = torch.norm(true_trans, dim=1, keepdim=True)
+    # Add small epsilon to avoid division by zero
+    epsilon = 1e-6
+    relative_trans_error = torch.norm(pred_trans - true_trans, dim=1) / (true_trans_norm.squeeze() + epsilon)
+    loss_trans = torch.mean(relative_trans_error ** 2)  # Squared relative error
+    
+    # Combine losses with beta weighting factor
     return loss_rot + beta * loss_trans
 
 # ----------------------------
