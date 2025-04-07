@@ -12,8 +12,7 @@ from model import PoseNet
 # Inference Setup
 # ----------------------------
 # Use environment variable for model path, default to 'posenet_speed.pth'
-MODEL_PATH = os.environ.get('MODEL_PATH', '../models/posenet_speed3.pth')
-MODEL_PATH = '../models/posenet_speed_run3.pth'
+MODEL_PATH = os.environ.get('MODEL_PATH', '../models/posenet_speed_run_EN.pth')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Preprocessing transform for inference (should match test transform from training)

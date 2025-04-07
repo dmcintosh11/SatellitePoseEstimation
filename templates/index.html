@@ -4,20 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Satellite Pose Estimation</title>
+    <title>Satellite Pose Estimation & 3D Model</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Load Model Viewer script -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
 </head>
 
 <body>
     <div class="container">
-        <h1>Satellite Pose Estimator</h1>
-        <p>Upload an image of a satellite to predict its pose (orientation as quaternion and position as translation
-            vector).</p>
+        <h1>Satellite Pose Estimator & 3D Reconstruction</h1>
+        <p>Upload an image to predict its pose and generate a 3D mesh using Stable Fast 3D.</p>
 
         <div class="upload-section">
             <label for="fileInput" class="file-label">Choose Satellite Image</label>
             <input type="file" id="fileInput" accept="image/png, image/jpeg, image/jpg">
-            <button id="predictButton" disabled>Predict Pose</button>
+            <button id="predictButton" disabled>Predict Pose & Generate Mesh</button>
         </div>
 
         <div id="status" class="status-message"></div>
@@ -28,9 +29,12 @@
                 <img id="imagePreview" src="#" alt="Input image preview" style="display: none;">
             </div>
             <div class="prediction-container">
-                <h2>Predicted Pose Visualization:</h2>
+                <h2>Generated 3D Model & Predicted Pose:</h2>
                 <div id="predictionResult" class="prediction-result">
-                    <p>Upload an image and click 'Predict Pose'.</p>
+                    <p>Upload an image and click 'Predict & Generate'.</p>
+                </div>
+                <div id="poseInfo" class="pose-info" style="margin-top: 15px; font-family: monospace; font-size: 0.9em;">
+                    <!-- Pose info will be displayed here -->
                 </div>
             </div>
         </div>
