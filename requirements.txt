@@ -2,3 +2,6 @@ torch
 torchvision
 Pillow
 Flask
+numpy             # For numerical operations
+scipy             # For rotation conversions
+opencv-python-headless # For image processing/drawing (no GUI)

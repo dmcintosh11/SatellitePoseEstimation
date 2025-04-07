@@ -35,73 +35,104 @@ class SpeedDataset(Dataset):
         t = torch.tensor(ann['r_Vo2To_vbs_true'], dtype=torch.float32) #translation
         return image, q, t
 
-# ----------------------------
-# Model Definition: PoseNet Variant
-# ----------------------------
+# # ----------------------------
+# # Model Definition: PoseNet Variant
+# # ----------------------------
+# class PoseNet(nn.Module):
+#     def __init__(self, pretrained=True, freeze_early_layers=True, dropout_rate=0.3):
+#         super(PoseNet, self).__init__()
+#         # Use ResNet-50 as backbone
+#         self.backbone = models.resnet50(weights=ResNet50_Weights.DEFAULT)
+#         num_features = self.backbone.fc.in_features
+#         # Remove the final classification layer
+#         self.backbone.fc = nn.Identity()
+
+#         if freeze_early_layers:
+#             # Freeze initial layers: conv1, bn1, layer1
+#             for name, param in self.backbone.named_parameters():
+#                 if name.startswith('conv1') or name.startswith('bn1') or name.startswith('layer1'):
+#                     param.requires_grad = False
+#             print("Froze ResNet layers: conv1, bn1, layer1")
+        
+#         # Shared feature processing layers
+#         self.shared_layers = nn.Sequential(
+#             nn.Linear(num_features, 1024),
+#             nn.BatchNorm1d(1024),
+#             nn.ReLU(),
+#             nn.Dropout(dropout_rate),
+#             nn.Linear(1024, 512),
+#             nn.BatchNorm1d(512),
+#             nn.ReLU(),
+#             nn.Dropout(dropout_rate)
+#         )
+        
+#         # Rotation-specific layers
+#         self.rot_layers = nn.Sequential(
+#             nn.Linear(512, 256),
+#             nn.BatchNorm1d(256),
+#             nn.ReLU(),
+#             nn.Dropout(dropout_rate),
+#             nn.Linear(256, 128),
+#             nn.ReLU()
+#         )
+#         self.fc_rot = nn.Linear(128, 4)  # Quaternion output
+        
+#         # Translation-specific layers
+#         self.trans_layers = nn.Sequential(
+#             nn.Linear(512, 256),
+#             nn.BatchNorm1d(256),
+#             nn.ReLU(),
+#             nn.Dropout(dropout_rate),
+#             nn.Linear(256, 128),
+#             nn.ReLU()
+#         )
+#         self.fc_trans = nn.Linear(128, 3)  # Translation output
+
+#     def forward(self, x):
+#         features = self.backbone(x)
+#         shared_features = self.shared_layers(features)
+        
+#         # Rotation branch
+#         rot_features = self.rot_layers(shared_features)
+#         rot = self.fc_rot(rot_features)
+#         # Normalize quaternion to unit length for a valid rotation
+#         rot = rot / rot.norm(p=2, dim=1, keepdim=True)
+        
+#         # Translation branch
+#         trans_features = self.trans_layers(shared_features)
+#         trans = self.fc_trans(trans_features)
+        
+#         return rot, trans
+    
 class PoseNet(nn.Module):
-    def __init__(self, pretrained=True, freeze_early_layers=True, dropout_rate=0.3):
+    # NOTE: We set pretrained=False and freeze_early_layers=False here
+    # because we are loading *already trained* weights, not initializing
+    # from scratch or ImageNet. The state dict contains the trained weights
+    # for all layers as they were during training.
+    def __init__(self, pretrained=False, freeze_early_layers=False):
         super(PoseNet, self).__init__()
-        # Use ResNet-50 as backbone
-        self.backbone = models.resnet50(weights=ResNet50_Weights.DEFAULT)
+        # Load architecture only. Use weights=None for newer torchvision
+        # or pretrained=False for older versions. Adapt if needed.
+        try:
+            self.backbone = models.resnet50(weights=ResNet50_Weights.DEFAULT)
+        except TypeError:
+            self.backbone = models.resnet50(weights=None) # Fallback for older torchvision
+            
         num_features = self.backbone.fc.in_features
-        # Remove the final classification layer
         self.backbone.fc = nn.Identity()
 
-        if freeze_early_layers:
-            # Freeze initial layers: conv1, bn1, layer1
-            for name, param in self.backbone.named_parameters():
-                if name.startswith('conv1') or name.startswith('bn1') or name.startswith('layer1'):
-                    param.requires_grad = False
-            print("Froze ResNet layers: conv1, bn1, layer1")
-        
-        # Shared feature processing layers
-        self.shared_layers = nn.Sequential(
-            nn.Linear(num_features, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(1024, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate)
-        )
-        
-        # Rotation-specific layers
-        self.rot_layers = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(256, 128),
-            nn.ReLU()
-        )
-        self.fc_rot = nn.Linear(128, 4)  # Quaternion output
-        
-        # Translation-specific layers
-        self.trans_layers = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.BatchNorm1d(256),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(256, 128),
-            nn.ReLU()
-        )
-        self.fc_trans = nn.Linear(128, 3)  # Translation output
+        # Recreate the same layers as during training
+        self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
+        self.fc_trans = nn.Linear(num_features, 3)  # Translation output
 
     def forward(self, x):
         features = self.backbone(x)
-        shared_features = self.shared_layers(features)
-        
-        # Rotation branch
-        rot_features = self.rot_layers(shared_features)
-        rot = self.fc_rot(rot_features)
+        rot = self.fc_rot(features)
+        trans = self.fc_trans(features)
         # Normalize quaternion to unit length for a valid rotation
-        rot = rot / rot.norm(p=2, dim=1, keepdim=True)
-        
-        # Translation branch
-        trans_features = self.trans_layers(shared_features)
-        trans = self.fc_trans(trans_features)
-        
+        # Add a small epsilon to prevent division by zero if norm is zero
+        norm = rot.norm(p=2, dim=1, keepdim=True)
+        rot = rot / (norm + 1e-8)
         return rot, trans
 
 # ----------------------------
@@ -152,7 +183,7 @@ def train(model, train_dataloader, optimizer, device, beta_loss):
         optimizer.zero_grad()
         pred_rot, pred_trans = model(images)
         rot_loss, trans_loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
-        loss = rot_loss + trans_loss
+        loss = rot_loss + beta_loss * trans_loss
         loss.backward()
         optimizer.step()
         
@@ -175,7 +206,7 @@ def test(model, test_dataloader, device, beta_loss):
             
             pred_rot, pred_trans = model(images)
             rot_loss, trans_loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
-            loss = rot_loss + trans_loss
+            loss = rot_loss + beta_loss * trans_loss
             
             total_loss += loss.item()
             total_rot_loss += rot_loss.item()

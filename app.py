@@ -3,8 +3,9 @@ from werkzeug.utils import secure_filename # For handling filenames securely
 import os
 import io
 
-# Import the prediction function from our inference script
+# Import the prediction function and the new drawing function
 from inference import predict_pose, loaded_model
+from visualization import draw_pose_axes # <-- Import drawing function
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -28,7 +29,7 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def handle_prediction():
-    """Handles image upload and returns pose prediction."""
+    """Handles image upload, predicts pose, draws axes, and returns visualized image."""
     if loaded_model is None:
          return jsonify({'error': 'Model not loaded on server. Cannot perform prediction.'}), 500
 
@@ -43,18 +44,24 @@ def handle_prediction():
     if file and allowed_file(file.filename):
         try:
             # Read image bytes directly from the file stream
+            # Need to reset stream pointer after reading if reading multiple times
             img_bytes = file.read()
+            file.seek(0) # Reset stream pointer in case needed later (though not currently)
             
             # Get prediction
             quaternion, translation = predict_pose(img_bytes)
             
             if quaternion is not None and translation is not None:
-                # Format the results nicely
-                result = {
-                    'quaternion': [round(x, 5) for x in quaternion],
-                    'translation': [round(x, 5) for x in translation]
-                }
-                return jsonify(result)
+                # Draw axes on the image
+                # Pass the original image bytes again
+                img_base64 = draw_pose_axes(img_bytes, quaternion, translation)
+
+                if img_base64:
+                    # Return the base64 encoded image with axes
+                    return jsonify({'image_with_axes': img_base64}) # Return base64 image
+                else:
+                    # Error during drawing
+                    return jsonify({'error': 'Prediction successful, but failed to draw visualization.'}), 500
             else:
                 return jsonify({'error': 'Prediction failed on server.'}), 500
                 

@@ -58,14 +58,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json(); // Always expect JSON response
 
             if (response.ok) {
-                // Display successful prediction
-                predictionResultDiv.innerHTML = `
-                    <p><strong>Quaternion (q_vbs2tango):</strong></p>
-                    <p>[${result.quaternion.join(', ')}]</p>
-                    <p><strong>Translation (r_Vo2To_vbs):</strong></p>
-                    <p>[${result.translation.join(', ')}]</p>
-                `;
-                setStatus('Prediction successful!', 'success');
+                // Display successful prediction - expect image data
+                if (result.image_with_axes) {
+                    predictionResultDiv.innerHTML = `
+                        <img src="data:image/png;base64,${result.image_with_axes}" alt="Image with predicted pose axes" style="max-width: 100%; height: auto;">
+                    `;
+                    setStatus('Prediction and visualization successful!', 'success');
+                } else {
+                    // Handle case where server might return success but no image (shouldn't happen with current app.py)
+                    predictionResultDiv.innerHTML = `<p>Error: Received success status but no visualized image data.</p>`;
+                    setStatus('Visualization failed on server.', 'error');
+                }
             } else {
                 // Display error from backend
                 predictionResultDiv.innerHTML = `<p>Error: ${result.error || 'Unknown error'}</p>`;
