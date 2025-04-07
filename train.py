@@ -35,7 +35,7 @@ class SpeedDataset(Dataset):
             image = self.transform(image)
         # Convert the quaternion and translation values to tensors
         # Ensure your JSON stores these as lists of numbers.
-        q = torch.tensor(ann['q_vbs2tango'], dtype=torch.float32) #quaternion
+        q = torch.tensor(ann['q_vbs2tango_true'], dtype=torch.float32) #quaternion
         t = torch.tensor(ann['r_Vo2To_vbs_true'], dtype=torch.float32) #translation
         return image, q, t
 
