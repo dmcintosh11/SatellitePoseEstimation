@@ -35,9 +35,24 @@ if not os.path.exists(SF3D_RUN_SCRIPT):
     print(f"Warning: Stable Fast 3D run script not found at {SF3D_RUN_SCRIPT}. Mesh generation will fail.")
     # Consider raising an error or disabling the feature if critical
 
+EXAMPLES_FOLDER = 'examples' # Define the examples folder name
+ALLOWED_EXAMPLE_EXTENSIONS = {'png', 'jpg', 'jpeg'} # Define allowed extensions
+
+# Ensure the examples folder exists
+if not os.path.exists(EXAMPLES_FOLDER):
+    os.makedirs(EXAMPLES_FOLDER)
+    print(f"Created examples folder at: {os.path.abspath(EXAMPLES_FOLDER)}")
+    print("Please add some example images (png, jpg, jpeg) to this folder.")
+elif not os.listdir(EXAMPLES_FOLDER):
+     print(f"Examples folder ({os.path.abspath(EXAMPLES_FOLDER)}) is empty. Feature will be inactive.")
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_example_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXAMPLE_EXTENSIONS
 
 @app.route('/')
 def index():
@@ -182,6 +197,38 @@ def handle_prediction():
 
     else:
         return jsonify({'error': 'File type not allowed.'}), 400
+
+@app.route('/examples')
+def list_examples():
+    """Returns a list of allowed example image filenames."""
+    try:
+        if not os.path.exists(EXAMPLES_FOLDER):
+             return jsonify({'error': 'Examples folder not found on server.'}), 404
+
+        example_files = [
+            f for f in os.listdir(EXAMPLES_FOLDER)
+            if os.path.isfile(os.path.join(EXAMPLES_FOLDER, f)) and allowed_example_file(f)
+        ]
+        return jsonify({'examples': example_files})
+    except Exception as e:
+        print(f"Error listing examples: {e}")
+        return jsonify({'error': 'Could not list example files.'}), 500
+
+@app.route('/examples/<path:filename>')
+def get_example_image(filename):
+    """Serves a specific example image file."""
+    try:
+        # Basic security check - prevent accessing files outside EXAMPLES_FOLDER
+        safe_path = os.path.abspath(os.path.join(EXAMPLES_FOLDER, filename))
+        if not safe_path.startswith(os.path.abspath(EXAMPLES_FOLDER)):
+             return "Forbidden", 403 # Prevent directory traversal
+
+        return send_from_directory(EXAMPLES_FOLDER, filename)
+    except FileNotFoundError:
+         return "Example image not found.", 404
+    except Exception as e:
+        print(f"Error serving example {filename}: {e}")
+        return "Error serving file.", 500
 
 # Serve static files (CSS, JS)
 @app.route('/static/<path:filename>')

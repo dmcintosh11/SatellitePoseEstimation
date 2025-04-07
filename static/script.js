@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const poseInfoDiv = document.getElementById('poseInfo');
     const modelViewerElement = document.getElementById('modelViewer'); // Added ID to model-viewer in HTML
     const visualizationImage = document.getElementById('visualizationImage'); // Get visualization image element
+    const exampleSelect = document.getElementById('exampleSelect'); // Get example dropdown
 
     let selectedFile = null;
     let currentBlobUrl = null; // To keep track for potential cleanup
@@ -62,9 +63,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // --- End Coordinate System Transformation ---
 
+    // --- Fetch and Populate Examples ---
+    async function loadExamples() {
+        try {
+            const response = await fetch('/examples');
+            if (!response.ok) {
+                console.error('Failed to fetch examples:', response.statusText);
+                exampleSelect.disabled = true; // Disable dropdown on error
+                exampleSelect.innerHTML = '<option value="">Examples unavailable</option>';
+                return;
+            }
+            const data = await response.json();
+            if (data.examples && data.examples.length > 0) {
+                exampleSelect.innerHTML = '<option value="">-- Select --</option>'; // Reset
+                data.examples.forEach(filename => {
+                    const option = document.createElement('option');
+                    option.value = filename;
+                    option.textContent = filename;
+                    exampleSelect.appendChild(option);
+                });
+                exampleSelect.disabled = false;
+            } else {
+                 exampleSelect.disabled = true;
+                 exampleSelect.innerHTML = '<option value="">No examples found</option>';
+            }
+        } catch (error) {
+            console.error('Error loading examples:', error);
+            exampleSelect.disabled = true;
+            exampleSelect.innerHTML = '<option value="">Error loading</option>';
+        }
+    }
 
-    fileInput.addEventListener('change', (event) => {
-        selectedFile = event.target.files[0];
+    // --- Function to handle setting the selected file and updating UI ---
+    function handleFileSelection(file) {
+        selectedFile = file;
         if (selectedFile) {
             const reader = new FileReader();
             reader.onload = function (e) {
@@ -85,26 +117,62 @@ document.addEventListener('DOMContentLoaded', () => {
                  currentBlobUrl = null;
             }
         } else {
-            imagePreview.style.display = 'none';
-            imagePreview.src = '#';
-            predictButton.disabled = true;
-            selectedFile = null;
-            modelViewerElement.src = null;
-            modelViewerElement.style.display = 'none';
-            visualizationImage.src = '#';
-            visualizationImage.style.display = 'none';
-            poseInfoDiv.innerHTML = '<p>Upload an image and click \'Predict & Generate\'.</p>';
-
-             if (currentBlobUrl) {
+             // Reset UI if file is null
+             imagePreview.style.display = 'none';
+             imagePreview.src = '#';
+             predictButton.disabled = true;
+             setStatus('');
+             modelViewerElement.src = null;
+             modelViewerElement.style.display = 'none';
+             visualizationImage.src = '#';
+             visualizationImage.style.display = 'none';
+             poseInfoDiv.innerHTML = '<p>Upload an image or select an example.</p>';
+              if (currentBlobUrl) {
                  URL.revokeObjectURL(currentBlobUrl);
                  currentBlobUrl = null;
+             }
+        }
+    }
+
+    // --- Event Listeners ---
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        handleFileSelection(file);
+        exampleSelect.value = ""; // Deselect example dropdown if file is chosen
+    });
+
+    exampleSelect.addEventListener('change', async (event) => {
+        const filename = event.target.value;
+        if (filename) {
+            setStatus('Loading example image...', 'loading');
+            try {
+                const response = await fetch(`/examples/${filename}`);
+                if (!response.ok) {
+                    setStatus(`Error loading example: ${response.statusText}`, 'error');
+                    handleFileSelection(null); // Clear selection
+                    return;
+                }
+                const imageBlob = await response.blob();
+                // Create a File object from the Blob to mimic user upload
+                const imageFile = new File([imageBlob], filename, { type: imageBlob.type });
+                handleFileSelection(imageFile);
+                fileInput.value = null; // Clear file input selection
+                setStatus('Example image loaded.', 'success');
+
+            } catch (error) {
+                console.error('Error fetching example image:', error);
+                setStatus('Failed to load example image.', 'error');
+                handleFileSelection(null);
             }
+        } else {
+            // "-- Select --" chosen
+            handleFileSelection(null);
         }
     });
 
     predictButton.addEventListener('click', async () => {
         if (!selectedFile) {
-            setStatus('Please select an image file first.', 'error');
+            setStatus('Please select an image file or an example first.', 'error');
             return;
         }
 
@@ -245,4 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.textContent = message;
         statusDiv.className = `status-message ${type}`;
     }
+
+    // --- Initial Load ---
+    loadExamples(); // Load examples when the page loads
 });
