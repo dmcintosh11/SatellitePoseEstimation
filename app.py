@@ -25,7 +25,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Path to the stable-fast-3d run.py script
 # IMPORTANT: Update this path to the correct location on your system!
-SF3D_RUN_SCRIPT = os.path.expanduser('~/workspace/stable-fast-3d/run.py') 
+SF3D_RUN_SCRIPT = os.path.expanduser('../stable-fast-3d/run.py') 
 if not os.path.exists(SF3D_RUN_SCRIPT):
     print(f"Warning: Stable Fast 3D run script not found at {SF3D_RUN_SCRIPT}. Mesh generation will fail.")
     # Consider raising an error or disabling the feature if critical
