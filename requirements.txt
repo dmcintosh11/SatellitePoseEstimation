@@ -1,6 +1,6 @@
 # Pin torch and torchvision to a recent version (e.g., >=2.1.0)
-torch>=2.3.0
-torchvision>=0.18.0
+torch
+torchvision
 Pillow
 Flask
 requests>=2.31 # Resolve jupyterlab-server conflict

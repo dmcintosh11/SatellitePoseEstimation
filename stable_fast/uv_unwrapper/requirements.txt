@@ -1,2 +1,2 @@
-torch
+torch==2.3.0+cu118
 numpy
