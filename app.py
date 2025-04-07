@@ -179,7 +179,7 @@ def static_files(filename):
 if __name__ == '__main__':
     # Use environment variables for host and port, useful for deployment
     host = os.environ.get('FLASK_HOST', '127.0.0.1')
-    port = int(os.environ.get('FLASK_PORT', 5000))
+    port = int(os.environ.get('FLASK_PORT', 4000))
     # Debug should be False in production
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' 
     print(f"Starting Flask server on {host}:{port} with debug={debug}")
