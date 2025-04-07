@@ -42,15 +42,13 @@ To train the model, run the `train.py` script with the appropriate arguments poi
 
 ```bash
 python train.py \
-    --annotation-file /path/to/your/train_annotations.json \
-    --img-dir /path/to/your/train_images/ \
-    --test-annotation-file /path/to/your/test_annotations.json \
-    --test-img-dir /path/to/your/test_images/ \
-    --output-model-path trained_models/posenet_speed_v1.pth \
-    --lr 1e-4 \
-    --beta-loss 100.0 \
+    --annotation-file ../speed/train.json \
+    --img-dir ../speed/images/train/ \
+    --test-annotation-file ../speed/real.json \
+    --test-img-dir ../speed/images/real/ \
+    --output-model-path ../models/posenet_speed_run1.pth \
     --batch-size 64 \
-    --num-epochs 25 \
+    --num-epochs 2 \
     --num-workers 8
 ```
 

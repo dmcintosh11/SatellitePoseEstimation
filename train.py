@@ -39,10 +39,10 @@ class SpeedDataset(Dataset):
 # Model Definition: PoseNet Variant
 # ----------------------------
 class PoseNet(nn.Module):
-    def __init__(self, pretrained=True, freeze_early_layers=True):
+    def __init__(self, pretrained=True, freeze_early_layers=True, dropout_rate=0.3):
         super(PoseNet, self).__init__()
         # Use ResNet-50 as backbone
-        self.backbone = models.resnet50(pretrained=pretrained)
+        self.backbone = models.resnet50(weights=pretrained)
         num_features = self.backbone.fc.in_features
         # Remove the final classification layer
         self.backbone.fc = nn.Identity()
@@ -54,16 +54,54 @@ class PoseNet(nn.Module):
                     param.requires_grad = False
             print("Froze ResNet layers: conv1, bn1, layer1")
         
-        # Separate fully connected layers for rotation (quaternion) and translation
-        self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
-        self.fc_trans = nn.Linear(num_features, 3)  # Translation output
+        # Shared feature processing layers
+        self.shared_layers = nn.Sequential(
+            nn.Linear(num_features, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(1024, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate)
+        )
+        
+        # Rotation-specific layers
+        self.rot_layers = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(256, 128),
+            nn.ReLU()
+        )
+        self.fc_rot = nn.Linear(128, 4)  # Quaternion output
+        
+        # Translation-specific layers
+        self.trans_layers = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(256, 128),
+            nn.ReLU()
+        )
+        self.fc_trans = nn.Linear(128, 3)  # Translation output
 
     def forward(self, x):
         features = self.backbone(x)
-        rot = self.fc_rot(features)
-        trans = self.fc_trans(features)
+        shared_features = self.shared_layers(features)
+        
+        # Rotation branch
+        rot_features = self.rot_layers(shared_features)
+        rot = self.fc_rot(rot_features)
         # Normalize quaternion to unit length for a valid rotation
         rot = rot / rot.norm(p=2, dim=1, keepdim=True)
+        
+        # Translation branch
+        trans_features = self.trans_layers(shared_features)
+        trans = self.fc_trans(trans_features)
+        
         return rot, trans
 
 # ----------------------------
@@ -72,7 +110,8 @@ class PoseNet(nn.Module):
 def pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=1.0):
     # Quaternion loss using geodesic distance for rotation
     # Normalize quaternions to ensure unit length
-    pred_rot_normalized = pred_rot / torch.norm(pred_rot, dim=1, keepdim=True)
+    # pred_rot_normalized = pred_rot / torch.norm(pred_rot, dim=1, keepdim=True) # Already normalized in forward pass
+    pred_rot_normalized = pred_rot
     true_rot_normalized = true_rot / torch.norm(true_rot, dim=1, keepdim=True)
     
     # Calculate dot product between predicted and true quaternions
@@ -95,8 +134,7 @@ def pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=1.0):
     relative_trans_error = torch.norm(pred_trans - true_trans, dim=1) / (true_trans_norm.squeeze() + epsilon)
     loss_trans = torch.mean(relative_trans_error ** 2)  # Squared relative error
     
-    # Combine losses with beta weighting factor
-    return loss_rot + beta * loss_trans
+    return loss_rot, loss_trans
 
 # ----------------------------
 # Training Loop
@@ -104,6 +142,8 @@ def pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=1.0):
 def train(model, train_dataloader, optimizer, device, beta_loss):
     model.train()
     total_loss = 0.0
+    rot_loss = 0.0
+    trans_loss = 0.0
     for images, true_rot, true_trans in train_dataloader:
         images = images.to(device)
         true_rot = true_rot.to(device)
@@ -111,12 +151,16 @@ def train(model, train_dataloader, optimizer, device, beta_loss):
         
         optimizer.zero_grad()
         pred_rot, pred_trans = model(images)
-        loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
+        rot_loss, trans_loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
+        loss = rot_loss + trans_loss
         loss.backward()
         optimizer.step()
         
         total_loss += loss.item()
-    return total_loss / len(train_dataloader)
+        rot_loss += rot_loss.item()
+        trans_loss += trans_loss.item()
+        
+    return total_loss / len(train_dataloader), rot_loss / len(train_dataloader), trans_loss / len(train_dataloader)
 
 def test(model, test_dataloader, device, beta_loss):
     model.eval()
@@ -171,14 +215,14 @@ def main(args):
     
     # Filter parameters to only include those that require gradients
     params_to_optimize = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = optim.Adam(params_to_optimize, lr=args.lr)
+    optimizer = optim.Adam(params_to_optimize)
     
     # Use num_epochs from args
     for epoch in range(args.num_epochs):
         print(f"Starting Epoch {epoch+1}/{args.num_epochs}...")
-        train_loss = train(model, train_dataloader, optimizer, device, args.beta_loss)
-        test_loss = test(model, test_dataloader, device, args.beta_loss)
-        print(f"Epoch {epoch+1}/{args.num_epochs}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}")
+        train_loss, train_rot_loss, train_trans_loss = train(model, train_dataloader, optimizer, device, args.beta_loss)
+        test_loss, test_rot_loss, test_trans_loss = test(model, test_dataloader, device, args.beta_loss)
+        print(f"\n\nEpoch {epoch+1}/{args.num_epochs}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}\nTrain Rot Loss: {train_rot_loss:.4f}, Test Rot Loss: {test_rot_loss:.4f}\nTrain Trans Loss: {train_trans_loss:.4f}, Test Trans Loss: {test_trans_loss:.4f}")
     
     # Save the trained model using output path from args
     print(f"Saving model to {args.output_model_path}")
