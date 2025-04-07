@@ -24,14 +24,29 @@
         <div id="status" class="status-message"></div>
 
         <div class="results-area">
-            <div class="image-preview-container">
-                <h2>Input Image:</h2>
-                <img id="imagePreview" src="#" alt="Input image preview" style="display: none;">
+            <div class="image-display-area">
+                <div class="image-preview-container">
+                    <h2>Input Image:</h2>
+                    <img id="imagePreview" src="#" alt="Input image preview" style="display: none;">
+                </div>
+                <div class="visualization-container">
+                    <h2>Pose Visualization:</h2>
+                    <img id="visualizationImage" src="#" alt="Pose visualization on image" style="display: none;">
+                </div>
             </div>
+
             <div class="prediction-container">
                 <h2>Generated 3D Model & Predicted Pose:</h2>
                 <div id="predictionResult" class="prediction-result">
-                    <p>Upload an image and click 'Predict & Generate'.</p>
+                    <model-viewer id="modelViewer" 
+                                  src=""
+                                  alt="Generated 3D model of the satellite"
+                                  camera-controls
+                                  style="display: none; width: 100%; height: 300px; background-color: #eee; border-radius: 5px;"
+                                  ar
+                                  ar-modes="webxr scene-viewer quick-look">
+                        <div slot="progress-bar"></div>
+                    </model-viewer>
                 </div>
                 <div id="poseInfo" class="pose-info" style="margin-top: 15px; font-family: monospace; font-size: 0.9em;">
                     <!-- Pose info will be displayed here -->
