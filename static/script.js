@@ -178,6 +178,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         modelViewerElement.src = currentBlobUrl;
                         modelViewerElement.style.display = 'block'; // Show viewer area
 
+                        // Add error handling for model loading
+                        modelViewerElement.addEventListener('error', (event) => {
+                            console.error('Model Viewer Error:', event.detail);
+                            predictionResultDiv.innerHTML = `<p>Error loading 3D model: ${event.detail?.message || 'Unknown loading error'}. Check console.</p>`;
+                            setStatus('Failed to load 3D model.', 'error');
+                            modelViewerElement.style.display = 'none'; // Hide viewer on error
+                         }, { once: true });
+
                         modelViewerElement.addEventListener('load', () => {
                              console.log("Model loaded, applying pose...");
 

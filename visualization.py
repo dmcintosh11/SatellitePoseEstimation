@@ -104,22 +104,52 @@ def draw_pose_axes(image_bytes, quaternion, translation):
                                                translation_vector, 
                                                CAMERA_MATRIX, 
                                                DIST_COEFFS)
-
         # Draw the axes lines on the image
         origin = tuple(map(int, image_points_2d[0].ravel()))
         x_axis_end = tuple(map(int, image_points_2d[1].ravel()))
         y_axis_end = tuple(map(int, image_points_2d[2].ravel()))
         z_axis_end = tuple(map(int, image_points_2d[3].ravel()))
 
-        # Draw lines: Red for X, Green for Y, Blue for Z
-        cv2.line(img, origin, x_axis_end, (0, 0, 255), 2) # Red (BGR)
-        cv2.line(img, origin, y_axis_end, (0, 255, 0), 2) # Green
-        cv2.line(img, origin, z_axis_end, (255, 0, 0), 2) # Blue
+        # Draw thicker lines with higher contrast colors
+        line_thickness = 4  # Increased from 2 to 4
+        
+        # Calculate extended axis endpoints (make lines 50% longer)
+        def extend_line(origin, end, factor=1.5):
+            # Vector from origin to end
+            dx = end[0] - origin[0]
+            dy = end[1] - origin[1]
+            # Extended endpoint
+            extended_x = int(origin[0] + dx * factor)
+            extended_y = int(origin[1] + dy * factor)
+            return (extended_x, extended_y)
+        
+        # Get extended endpoints
+        x_axis_extended = extend_line(origin, x_axis_end)
+        y_axis_extended = extend_line(origin, y_axis_end)
+        z_axis_extended = extend_line(origin, z_axis_end)
+        
+        # Draw lines: Red for X, Green for Y, Blue for Z with increased brightness
+        cv2.line(img, origin, x_axis_extended, (0, 0, 255), line_thickness)  # Red (BGR)
+        cv2.line(img, origin, y_axis_extended, (0, 255, 0), line_thickness)  # Green
+        cv2.line(img, origin, z_axis_extended, (255, 0, 0), line_thickness)  # Blue
+        
+        # Add arrowheads to make axes more distinguishable
+        arrowhead_size = 10
+        cv2.arrowedLine(img, origin, x_axis_extended, (0, 0, 255), line_thickness, tipLength=0.3)
+        cv2.arrowedLine(img, origin, y_axis_extended, (0, 255, 0), line_thickness, tipLength=0.3)
+        cv2.arrowedLine(img, origin, z_axis_extended, (255, 0, 0), line_thickness, tipLength=0.3)
+        
+        # Add axis labels at the extended endpoints
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.8
+        font_thickness = 2
+        cv2.putText(img, 'X', x_axis_extended, font, font_scale, (0, 0, 255), font_thickness)
+        cv2.putText(img, 'Y', y_axis_extended, font, font_scale, (0, 255, 0), font_thickness)
+        cv2.putText(img, 'Z', z_axis_extended, font, font_scale, (255, 0, 0), font_thickness)
 
         # Encode the modified image to base64 string
         _, buffer = cv2.imencode('.png', img)
         img_base64 = base64.b64encode(buffer).decode('utf-8')
-        
         return img_base64
 
     except Exception as e:
