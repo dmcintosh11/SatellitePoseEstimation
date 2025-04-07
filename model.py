@@ -1,59 +1,57 @@
 import torch
 import torch.nn as nn
 from torchvision import models
-from torchvision.models import ResNet50_Weights # Make sure this import is present if used
+# Make sure weight enums are imported if used directly
+from torchvision.models import EfficientNet_V2_S_Weights, ResNet50_Weights
 
 # ----------------------------
-# Model Definition: PoseNet Variant
+# Model Definition: PoseNet Variant with EfficientNetV2-S Backbone
 # ----------------------------
-# Using the simpler version that seems active in train.py currently.
-# If the more complex one (with shared_layers, rot_layers, trans_layers) 
-# should be used, replace this definition with that one.
 class PoseNet(nn.Module):
-    # NOTE: The parameters `pretrained` and `freeze_early_layers` are relevant
-    # during TRAINING initialization. When loading a saved model for INFERENCE,
-    # you typically initialize with pretrained=False/weights=None as the trained
-    # weights are loaded from the state_dict.
-    def __init__(self, pretrained=True, freeze_early_layers=True):
+    def __init__(self, pretrained=True, freeze_early_layers=False): # freeze_early_layers kept in signature but not used currently
         super(PoseNet, self).__init__()
         
-        # Determine how to load weights based on torchvision version and `pretrained` flag
-        resnet_weights = None
+        # Determine how to load weights for EfficientNetV2-S
+        effnet_weights = None
         if pretrained:
-             # Use the modern way with specific weights enum if available
-            if hasattr(models, 'ResNet50_Weights'):
-                 resnet_weights = models.ResNet50_Weights.DEFAULT
+            if hasattr(models, 'EfficientNet_V2_S_Weights'):
+                 effnet_weights = models.EfficientNet_V2_S_Weights.DEFAULT
             else:
-                 # Fallback for older torchvision, directly uses boolean
-                 # Note: this way might be deprecated in future torchvision
-                 resnet_weights = pretrained # Pass True/False directly
+                 # Fallback might just be `pretrained=True` if enum doesn't exist
+                 effnet_weights = pretrained # Boolean for older torchvision?
 
-        # Load backbone architecture, potentially with pretrained weights
-        # The 'weights' argument is preferred in newer torchvision
+        # Load EfficientNetV2-S backbone
         try:
-             self.backbone = models.resnet50(weights=resnet_weights)
-        except TypeError: # Handle older torchvision that might use 'pretrained=' boolean
-             self.backbone = models.resnet50(pretrained=bool(resnet_weights))
+            effnet_backbone = models.efficientnet_v2_s(weights=effnet_weights)
+        except TypeError:
+            # Fallback for older torchvision that might expect boolean `pretrained`
+            effnet_backbone = models.efficientnet_v2_s(pretrained=bool(effnet_weights))
 
+        # Extract features before the final classifier layer
+        # For EfficientNetV2, the classifier is typically `effnet_backbone.classifier`
+        # We need the number of input features to the last linear layer
+        if isinstance(effnet_backbone.classifier, nn.Sequential) and len(effnet_backbone.classifier) > 0:
+            # Access the last layer of the classifier sequence
+            final_layer = effnet_backbone.classifier[-1]
+            if isinstance(final_layer, nn.Linear):
+                num_features = final_layer.in_features
+                # Replace the classifier with Identity
+                effnet_backbone.classifier = nn.Identity()
+            else:
+                raise TypeError("EfficientNetV2 classifier's last layer is not Linear.")
+        else:
+            raise TypeError("EfficientNetV2 classifier structure not as expected.")
+            
+        self.backbone = effnet_backbone
 
-        num_features = self.backbone.fc.in_features
-        # Remove the final classification layer
-        self.backbone.fc = nn.Identity()
+        # ---- Freezing Logic Removed ----
+        # Freezing specific blocks in EfficientNet is less standard than ResNet.
+        # Fine-tuning the entire network or using differential LR is common.
+        if freeze_early_layers:
+             print("Warning: freeze_early_layers=True is not actively implemented for EfficientNetV2 backbone in this version. Fine-tuning all layers.")
+        # --------------------------------
 
-        if freeze_early_layers and pretrained: # Only freeze if using pretrained weights
-            # Freeze initial layers: conv1, bn1, layer1
-            print("Freezing ResNet layers: conv1, bn1, layer1")
-            for name, param in self.backbone.named_parameters():
-                # Make freezing logic more robust by checking layer names carefully
-                layer_name_parts = name.split('.')
-                if len(layer_name_parts) > 0:
-                    if layer_name_parts[0] in ['conv1', 'bn1'] or \
-                       (layer_name_parts[0] == 'layer1'): # Freeze the entire first layer block
-                         param.requires_grad = False
-        elif freeze_early_layers and not pretrained:
-             print("Warning: freeze_early_layers=True but pretrained=False. Not freezing any layers.")
-
-        # Recreate the same layers as during training
+        # Recreate the same output layers, now connected to EfficientNet features
         self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
         self.fc_trans = nn.Linear(num_features, 3)  # Translation output
 
@@ -62,18 +60,9 @@ class PoseNet(nn.Module):
         rot = self.fc_rot(features)
         trans = self.fc_trans(features)
         # Normalize quaternion to unit length for a valid rotation
-        # Add a small epsilon to prevent division by zero if norm is zero
         norm = rot.norm(p=2, dim=1, keepdim=True)
         rot = rot / (norm + 1e-8) # Add epsilon for numerical stability
         return rot, trans
 
-# # If you intend to use the more complex PoseNet version (currently commented out 
-# # in train.py), uncomment it here and comment out the simpler one above.
-# # Make sure to adjust the __init__ and forward methods accordingly.
-# class PoseNetComplex(nn.Module):
-#      def __init__(self, pretrained=True, freeze_early_layers=True, dropout_rate=0.3):
-#           # ... (rest of the complex model definition) ...
-#          pass
-#      def forward(self, x):
-#           # ... (forward pass for complex model) ...
-#          pass
+# Keep the commented-out complex version if needed for reference
+# class PoseNetComplex(nn.Module): ...

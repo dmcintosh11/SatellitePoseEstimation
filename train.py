@@ -253,11 +253,12 @@ def main(args):
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     
-    model = PoseNet(pretrained=True, freeze_early_layers=True).to(device)
+    model = PoseNet(pretrained=True, freeze_early_layers=False).to(device)
     
-    # Filter parameters to only include those that require gradients
+    # Filter parameters (optional now, but harmless)
     params_to_optimize = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = optim.Adam(params_to_optimize)
+    # Ensure learning rate from args is passed to optimizer
+    optimizer = optim.Adam(params_to_optimize, lr=args.lr)
     
     # Use num_epochs from args
     for epoch in range(args.num_epochs):
@@ -287,7 +288,7 @@ if __name__ == '__main__':
 
     # Training hyperparameters
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate.')
-    parser.add_argument('--beta-loss', type=float, default=1.0, help='Weighting factor for translation loss.')
+    parser.add_argument('--beta-loss', type=float, default=50.0, help='Weighting factor for translation loss.')
     parser.add_argument('--batch-size', type=int, default=32, help='Batch size for training and testing.')
     parser.add_argument('--num-epochs', type=int, default=10, help='Number of training epochs.')
     parser.add_argument('--num-workers', type=int, default=4, help='Number of workers for DataLoader.')
