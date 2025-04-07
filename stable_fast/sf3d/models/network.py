@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from jaxtyping import Float
 from torch import Tensor
-from torch.amp import custom_bwd, custom_fwd
+from torch import custom_bwd, custom_fwd
 from torch.autograd import Function
 
 from sf3d.models.utils import BaseModule, normalize
