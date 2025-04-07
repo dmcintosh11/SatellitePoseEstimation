@@ -5,45 +5,15 @@ from PIL import Image
 import io
 import os # Added for model path flexibility
 
-# ----------------------------
-# Model Definition (Copied from train.py)
-# ----------------------------
-class PoseNet(nn.Module):
-    # NOTE: We set pretrained=False and freeze_early_layers=False here
-    # because we are loading *already trained* weights, not initializing
-    # from scratch or ImageNet. The state dict contains the trained weights
-    # for all layers as they were during training.
-    def __init__(self, pretrained=False, freeze_early_layers=False):
-        super(PoseNet, self).__init__()
-        # Load architecture only. Use weights=None for newer torchvision
-        # or pretrained=False for older versions. Adapt if needed.
-        try:
-            self.backbone = models.resnet50(weights=None)
-        except TypeError:
-            self.backbone = models.resnet50(pretrained=False) # Fallback for older torchvision
-            
-        num_features = self.backbone.fc.in_features
-        self.backbone.fc = nn.Identity()
-
-        # Recreate the same layers as during training
-        self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
-        self.fc_trans = nn.Linear(num_features, 3)  # Translation output
-
-    def forward(self, x):
-        features = self.backbone(x)
-        rot = self.fc_rot(features)
-        trans = self.fc_trans(features)
-        # Normalize quaternion to unit length for a valid rotation
-        # Add a small epsilon to prevent division by zero if norm is zero
-        norm = rot.norm(p=2, dim=1, keepdim=True)
-        rot = rot / (norm + 1e-8)
-        return rot, trans
+# Import the PoseNet model definition
+from model import PoseNet 
 
 # ----------------------------
 # Inference Setup
 # ----------------------------
 # Use environment variable for model path, default to 'posenet_speed.pth'
-MODEL_PATH = os.environ.get('MODEL_PATH', 'posenet_speed.pth')
+MODEL_PATH = os.environ.get('MODEL_PATH', '../models/posenet_speed3.pth')
+MODEL_PATH = '../models/posenet_speed_run3.pth'
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Preprocessing transform for inference (should match test transform from training)
@@ -63,7 +33,10 @@ def load_model(model_path=MODEL_PATH):
         
     print(f"Loading model from {model_path} for device: {DEVICE}")
     try:
-        model = PoseNet() # Initialize model architecture
+        # Initialize model architecture using the imported class.
+        # Set pretrained=False as we're loading a state dict, not ImageNet weights here.
+        model = PoseNet(pretrained=False, freeze_early_layers=False)
+        
         # Load the saved state dictionary
         # Use map_location to ensure compatibility if trained on GPU but inferring on CPU
         model.load_state_dict(torch.load(model_path, map_location=DEVICE))

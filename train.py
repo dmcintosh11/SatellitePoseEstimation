@@ -7,7 +7,11 @@ from PIL import Image
 import json
 import os
 import argparse
-from torchvision.models import ResNet50_Weights
+# from torchvision.models import ResNet50_Weights # This is now handled within model.py
+
+# Import the PoseNet model definition
+from model import PoseNet
+
 # ----------------------------
 # Dataset Definition
 # ----------------------------
@@ -104,36 +108,36 @@ class SpeedDataset(Dataset):
         
 #         return rot, trans
     
-class PoseNet(nn.Module):
-    # NOTE: We set pretrained=False and freeze_early_layers=False here
-    # because we are loading *already trained* weights, not initializing
-    # from scratch or ImageNet. The state dict contains the trained weights
-    # for all layers as they were during training.
-    def __init__(self, pretrained=False, freeze_early_layers=False):
-        super(PoseNet, self).__init__()
-        # Load architecture only. Use weights=None for newer torchvision
-        # or pretrained=False for older versions. Adapt if needed.
-        try:
-            self.backbone = models.resnet50(weights=ResNet50_Weights.DEFAULT)
-        except TypeError:
-            self.backbone = models.resnet50(weights=None) # Fallback for older torchvision
-            
-        num_features = self.backbone.fc.in_features
-        self.backbone.fc = nn.Identity()
+# class PoseNet(nn.Module):
+#     # NOTE: We set pretrained=False and freeze_early_layers=False here
+#     # because we are loading *already trained* weights, not initializing
+#     # from scratch or ImageNet. The state dict contains the trained weights
+#     # for all layers as they were during training.
+#     def __init__(self, pretrained=False, freeze_early_layers=False):
+#         super(PoseNet, self).__init__()
+#         # Load architecture only. Use weights=None for newer torchvision
+#         # or pretrained=False for older versions. Adapt if needed.
+#         try:
+#             self.backbone = models.resnet50(weights=ResNet50_Weights.DEFAULT)
+#         except TypeError:
+#             self.backbone = models.resnet50(weights=None) # Fallback for older torchvision
+#             
+#         num_features = self.backbone.fc.in_features
+#         self.backbone.fc = nn.Identity()
 
-        # Recreate the same layers as during training
-        self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
-        self.fc_trans = nn.Linear(num_features, 3)  # Translation output
+#         # Recreate the same layers as during training
+#         self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
+#         self.fc_trans = nn.Linear(num_features, 3)  # Translation output
 
-    def forward(self, x):
-        features = self.backbone(x)
-        rot = self.fc_rot(features)
-        trans = self.fc_trans(features)
-        # Normalize quaternion to unit length for a valid rotation
-        # Add a small epsilon to prevent division by zero if norm is zero
-        norm = rot.norm(p=2, dim=1, keepdim=True)
-        rot = rot / (norm + 1e-8)
-        return rot, trans
+#     def forward(self, x):
+#         features = self.backbone(x)
+#         rot = self.fc_rot(features)
+#         trans = self.fc_trans(features)
+#         # Normalize quaternion to unit length for a valid rotation
+#         # Add a small epsilon to prevent division by zero if norm is zero
+#         norm = rot.norm(p=2, dim=1, keepdim=True)
+#         rot = rot / (norm + 1e-8)
+#         return rot, trans
 
 # ----------------------------
 # Loss Function
@@ -260,7 +264,7 @@ def main(args):
         print(f"Starting Epoch {epoch+1}/{args.num_epochs}...")
         train_loss, train_rot_loss, train_trans_loss = train(model, train_dataloader, optimizer, device, args.beta_loss)
         test_loss, test_rot_loss, test_trans_loss = test(model, test_dataloader, device, args.beta_loss)
-        print(f"\n\nEpoch {epoch+1}/{args.num_epochs}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}\nTrain Rot Loss: {train_rot_loss:.4f}, Test Rot Loss: {test_rot_loss:.4f}\nTrain Trans Loss: {train_trans_loss:.4f}, Test Trans Loss: {test_trans_loss:.4f}")
+        print(f"\n\nEpoch {epoch+1}/{args.num_epochs}, Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}\nTrain Rot Loss: {train_rot_loss:.4f}, Test Rot Loss: {test_rot_loss:.4f}\nTrain Scaled Trans Loss: {args.beta_loss * train_trans_loss:.4f}, Test Scaled Trans Loss: {args.beta_loss * test_trans_loss:.4f}")
     
     # Save the trained model using output path from args
     print(f"Saving model to {args.output_model_path}")
