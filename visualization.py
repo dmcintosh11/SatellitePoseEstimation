@@ -96,7 +96,6 @@ def draw_pose_axes(image_bytes, quaternion, translation):
             [0, AXIS_LENGTH, 0], # Y-axis end
             [0, 0, AXIS_LENGTH]  # Z-axis end
         ]).reshape(-1, 3)
-
         # Project 3D points to 2D image plane
         # rotation_vector is applied *first*, then translation_vector
         image_points_2d, _ = cv2.projectPoints(axis_points_3d, 
@@ -111,10 +110,10 @@ def draw_pose_axes(image_bytes, quaternion, translation):
         z_axis_end = tuple(map(int, image_points_2d[3].ravel()))
 
         # Draw thicker lines with higher contrast colors
-        line_thickness = 4  # Increased from 2 to 4
+        line_thickness = 6  # Increased from 4 to 6 for better visibility
         
-        # Calculate extended axis endpoints (make lines 50% longer)
-        def extend_line(origin, end, factor=1.5):
+        # Calculate extended axis endpoints (make lines 200% longer)
+        def extend_line(origin, end, factor=2.0):
             # Vector from origin to end
             dx = end[0] - origin[0]
             dy = end[1] - origin[1]
@@ -128,24 +127,24 @@ def draw_pose_axes(image_bytes, quaternion, translation):
         y_axis_extended = extend_line(origin, y_axis_end)
         z_axis_extended = extend_line(origin, z_axis_end)
         
-        # Draw lines: Red for X, Green for Y, Blue for Z with increased brightness
+        # Draw lines with brighter colors for better visibility
+        # Increased color intensity to maximum (255)
         cv2.line(img, origin, x_axis_extended, (0, 0, 255), line_thickness)  # Red (BGR)
         cv2.line(img, origin, y_axis_extended, (0, 255, 0), line_thickness)  # Green
         cv2.line(img, origin, z_axis_extended, (255, 0, 0), line_thickness)  # Blue
         
-        # Add arrowheads to make axes more distinguishable
-        arrowhead_size = 10
-        cv2.arrowedLine(img, origin, x_axis_extended, (0, 0, 255), line_thickness, tipLength=0.3)
-        cv2.arrowedLine(img, origin, y_axis_extended, (0, 255, 0), line_thickness, tipLength=0.3)
-        cv2.arrowedLine(img, origin, z_axis_extended, (255, 0, 0), line_thickness, tipLength=0.3)
+        # Add larger arrowheads to make axes more distinguishable
+        cv2.arrowedLine(img, origin, x_axis_extended, (0, 0, 255), line_thickness, tipLength=0.6)
+        cv2.arrowedLine(img, origin, y_axis_extended, (0, 255, 0), line_thickness, tipLength=0.6)
+        cv2.arrowedLine(img, origin, z_axis_extended, (255, 0, 0), line_thickness, tipLength=0.6)
         
-        # Add axis labels at the extended endpoints
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.8
-        font_thickness = 2
-        cv2.putText(img, 'X', x_axis_extended, font, font_scale, (0, 0, 255), font_thickness)
-        cv2.putText(img, 'Y', y_axis_extended, font, font_scale, (0, 255, 0), font_thickness)
-        cv2.putText(img, 'Z', z_axis_extended, font, font_scale, (255, 0, 0), font_thickness)
+        # # Add axis labels at the extended endpoints with larger font
+        # font = cv2.FONT_HERSHEY_SIMPLEX
+        # font_scale = 1.0
+        # font_thickness = 2
+        # cv2.putText(img, 'X', x_axis_extended, font, font_scale, (0, 0, 255), font_thickness)
+        # cv2.putText(img, 'Y', y_axis_extended, font, font_scale, (0, 255, 0), font_thickness)
+        # cv2.putText(img, 'Z', z_axis_extended, font, font_scale, (255, 0, 0), font_thickness)
 
         # Encode the modified image to base64 string
         _, buffer = cv2.imencode('.png', img)
