@@ -174,7 +174,8 @@ def test(model, test_dataloader, device, beta_loss):
             true_trans = true_trans.to(device)
             
             pred_rot, pred_trans = model(images)
-            loss, rot_loss, trans_loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
+            rot_loss, trans_loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
+            loss = rot_loss + trans_loss
             
             total_loss += loss.item()
             total_rot_loss += rot_loss.item()
