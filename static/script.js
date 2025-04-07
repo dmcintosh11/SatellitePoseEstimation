@@ -74,15 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.readAsDataURL(selectedFile);
             predictButton.disabled = false;
             setStatus('');
-            predictionResultDiv.innerHTML = ''; // Clear model viewer area too
             modelViewerElement.src = null;
             modelViewerElement.style.display = 'none';
-            visualizationImage.src = '#'; // Clear visualization
+            visualizationImage.src = '#';
             visualizationImage.style.display = 'none';
-            poseInfoDiv.innerHTML = '<p>Image selected. Click \'Predict & Generate\'.</p>'; // Inform user
+            poseInfoDiv.innerHTML = '<p>Image selected. Click \'Predict & Generate\'.</p>';
 
             if (currentBlobUrl) {
-                 URL.revokeObjectURL(currentBlobUrl); // Clean up old blob URL
+                 URL.revokeObjectURL(currentBlobUrl);
                  currentBlobUrl = null;
             }
         } else {
@@ -90,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
             imagePreview.src = '#';
             predictButton.disabled = true;
             selectedFile = null;
-            predictionResultDiv.innerHTML = '';
             modelViewerElement.src = null;
             modelViewerElement.style.display = 'none';
             visualizationImage.src = '#';
@@ -112,11 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         predictButton.disabled = true;
         setStatus('Processing... Predicting pose and generating mesh...', 'loading');
-        predictionResultDiv.innerHTML = ''; // Clear results div for model viewer
         poseInfoDiv.innerHTML = '';
-        modelViewerElement.style.display = 'none'; // Hide until loaded
+        modelViewerElement.style.display = 'none';
         modelViewerElement.src = null;
-        visualizationImage.src = '#'; // Clear previous visualization
+        visualizationImage.src = '#';
         visualizationImage.style.display = 'none';
 
          if (currentBlobUrl) {
@@ -140,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let finalStatus = 'Processing completed.';
                 let statusType = 'success';
 
-                // Display Pose Info (always try to display if available)
+                // Display Pose Info
                 if (result.quaternion && result.translation) {
                      poseInfoDiv.innerHTML = `
                         <p><strong>Predicted Pose (Camera Coordinates):</strong></p>
@@ -160,70 +157,56 @@ document.addEventListener('DOMContentLoaded', () => {
                     visualizationImage.style.display = 'none';
                 }
 
-                // Handle mesh data - Create Blob URL and display model-viewer
+                // Handle mesh data
                 if (result.mesh_glb_base64 && result.quaternion && result.translation) {
                     console.log("Received 3D mesh and pose data. Setting up model-viewer...");
                     try {
                         const blob = base64ToBlob(result.mesh_glb_base64, 'model/gltf-binary');
-                        currentBlobUrl = URL.createObjectURL(blob); // Store for cleanup
+                        currentBlobUrl = URL.createObjectURL(blob);
 
-                        // Transform pose for model-viewer
                         const { qMvString, tMvString, tMvArray } = transformPoseCvToMv(result.quaternion, result.translation);
                         console.log("Transformed Pose (ModelViewer Coords):");
                         console.log("  Position:", tMvString);
                         console.log("  Orientation:", qMvString);
 
-
-                        // Set the src *first*, then wait for load event
                         modelViewerElement.src = currentBlobUrl;
-                        modelViewerElement.style.display = 'block'; // Show viewer area
+                        modelViewerElement.style.display = 'block';
 
-                        // Add error handling for model loading
                         modelViewerElement.addEventListener('error', (event) => {
                             console.error('Model Viewer Error:', event.detail);
-                            predictionResultDiv.innerHTML = `<p>Error loading 3D model: ${event.detail?.message || 'Unknown loading error'}. Check console.</p>`;
+                            poseInfoDiv.innerHTML += `<p style="color: red;">Error loading 3D model: ${event.detail?.message || 'Unknown loading error'}.</p>`;
                             setStatus('Failed to load 3D model.', 'error');
-                            modelViewerElement.style.display = 'none'; // Hide viewer on error
+                            modelViewerElement.style.display = 'none';
                          }, { once: true });
 
                         modelViewerElement.addEventListener('load', () => {
                              console.log("Model loaded, applying pose...");
-
-                            // --- Apply Pose ---
                             modelViewerElement.orientation = qMvString;
                             modelViewerElement.position = tMvString;
-
-                            // --- Adjust Camera ---
-                            // Target the model's new position
                             modelViewerElement.cameraTarget = tMvString;
-                            // Set a reasonable camera orbit (distance slightly away from model)
-                            // Adjust '1.5m' based on typical model scale if needed
-                            const distance = vec3.length(tMvArray) * 2.5; // Example: distance based on translation magnitude
-                            modelViewerElement.cameraOrbit = `0deg 75deg ${Math.max(distance, 0.5)}m`; // Ensure minimum distance
-
-                            modelViewerElement.jumpCameraToGoal(); // Apply camera changes immediately
-
+                            const distance = vec3.length(tMvArray) * 2.5;
+                            modelViewerElement.cameraOrbit = `0deg 75deg ${Math.max(distance, 0.5)}m`;
+                            modelViewerElement.jumpCameraToGoal();
                             console.log("Pose applied to model-viewer.");
-                         }, { once: true }); // Important: use 'once' so listener is removed after firing
+                         }, { once: true });
 
                         finalStatus = 'Pose prediction and mesh generation successful! Model posed.';
                         setStatus(finalStatus, statusType);
 
                     } catch (e) {
                          console.error("Error processing/posing mesh data:", e);
-                         predictionResultDiv.innerHTML = `<p>Error displaying/posing 3D model: ${e.message}</p>`; // Show error in results div
-                         modelViewerElement.style.display = 'none'; // Hide viewer on error
+                         poseInfoDiv.innerHTML += `<p style="color: red;">Error displaying/posing 3D model: ${e.message}</p>`;
+                         modelViewerElement.style.display = 'none';
                          finalStatus = 'Pose prediction successful, but failed to display/pose mesh.';
                          setStatus(finalStatus, 'error');
                     }
                 } else if (result.mesh_glb_base64) {
-                     // Mesh received but pose missing
                      console.log("Mesh data received, but pose data missing. Displaying model without pose.");
                       const blob = base64ToBlob(result.mesh_glb_base64, 'model/gltf-binary');
                       currentBlobUrl = URL.createObjectURL(blob);
                       modelViewerElement.src = currentBlobUrl;
-                      modelViewerElement.orientation = "0 0 0 1"; // Reset orientation
-                      modelViewerElement.position = "0 0 0";   // Reset position
+                      modelViewerElement.orientation = "0 0 0 1";
+                      modelViewerElement.position = "0 0 0";
                       modelViewerElement.cameraTarget = "auto auto auto";
                       modelViewerElement.cameraOrbit = "auto auto auto";
                       modelViewerElement.style.display = 'block';
@@ -231,29 +214,25 @@ document.addEventListener('DOMContentLoaded', () => {
                       setStatus(finalStatus, 'warning');
                 }
                  else {
-                    // No mesh generated or sent
                     console.log("Mesh generation skipped or failed.");
-                    // Don't clear predictionResultDiv if pose info is there
-                    // predictionResultDiv.innerHTML = '<p>Mesh generation failed or was skipped.</p>';
-                     finalStatus = 'Pose prediction successful (mesh failed/skipped).';
-                      setStatus(finalStatus, statusType); // Use statusType from initial check
+                    poseInfoDiv.innerHTML += '<p>Mesh generation failed or was skipped.</p>';
+                    finalStatus = 'Pose prediction successful (mesh failed/skipped).';
+                    setStatus(finalStatus, statusType);
                 }
 
             } else {
-                predictionResultDiv.innerHTML = `<p>Error: ${result.error || 'Unknown error'}</p>`;
-                poseInfoDiv.innerHTML = '';
+                poseInfoDiv.innerHTML = `<p style="color: red;">Error: ${result.error || 'Unknown error'}</p>`;
                 setStatus('Processing failed.', 'error');
                  modelViewerElement.style.display = 'none';
-                 visualizationImage.src = '#'; // Clear visualization on error
+                 visualizationImage.src = '#';
                  visualizationImage.style.display = 'none';
             }
         } catch (error) {
             console.error('Prediction request failed:', error);
-            predictionResultDiv.innerHTML = `<p>Error: Could not connect to the server or an unexpected error occurred.</p>`;
-            poseInfoDiv.innerHTML = '';
+            poseInfoDiv.innerHTML = `<p style="color: red;">Error: Could not connect to the server or an unexpected error occurred.</p>`;
             setStatus('Request failed.', 'error');
              modelViewerElement.style.display = 'none';
-             visualizationImage.src = '#'; // Clear visualization on error
+             visualizationImage.src = '#';
              visualizationImage.style.display = 'none';
         } finally {
             if (selectedFile) {
