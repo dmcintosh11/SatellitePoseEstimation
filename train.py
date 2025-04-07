@@ -7,7 +7,7 @@ from PIL import Image
 import json
 import os
 import argparse
-
+from torchvision.models import ResNet50_Weights
 # ----------------------------
 # Dataset Definition
 # ----------------------------
@@ -42,7 +42,7 @@ class PoseNet(nn.Module):
     def __init__(self, pretrained=True, freeze_early_layers=True, dropout_rate=0.3):
         super(PoseNet, self).__init__()
         # Use ResNet-50 as backbone
-        self.backbone = models.resnet50(weights=pretrained)
+        self.backbone = models.resnet50(weights=ResNet50_Weights.DEFAULT)
         num_features = self.backbone.fc.in_features
         # Remove the final classification layer
         self.backbone.fc = nn.Identity()
@@ -142,8 +142,8 @@ def pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=1.0):
 def train(model, train_dataloader, optimizer, device, beta_loss):
     model.train()
     total_loss = 0.0
-    rot_loss = 0.0
-    trans_loss = 0.0
+    total_rot_loss = 0.0
+    total_trans_loss = 0.0
     for images, true_rot, true_trans in train_dataloader:
         images = images.to(device)
         true_rot = true_rot.to(device)
@@ -157,14 +157,16 @@ def train(model, train_dataloader, optimizer, device, beta_loss):
         optimizer.step()
         
         total_loss += loss.item()
-        rot_loss += rot_loss.item()
-        trans_loss += trans_loss.item()
+        total_rot_loss += rot_loss.item()
+        total_trans_loss += trans_loss.item()
         
-    return total_loss / len(train_dataloader), rot_loss / len(train_dataloader), trans_loss / len(train_dataloader)
+    return total_loss / len(train_dataloader), total_rot_loss / len(train_dataloader), total_trans_loss / len(train_dataloader)
 
 def test(model, test_dataloader, device, beta_loss):
     model.eval()
     total_loss = 0.0
+    total_rot_loss = 0.0
+    total_trans_loss = 0.0
     with torch.no_grad():
         for images, true_rot, true_trans in test_dataloader:
             images = images.to(device)
@@ -172,9 +174,13 @@ def test(model, test_dataloader, device, beta_loss):
             true_trans = true_trans.to(device)
             
             pred_rot, pred_trans = model(images)
-            loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
+            loss, rot_loss, trans_loss = pose_loss(pred_rot, pred_trans, true_rot, true_trans, beta=beta_loss)
+            
             total_loss += loss.item()
-    return total_loss / len(test_dataloader)
+            total_rot_loss += rot_loss.item()
+            total_trans_loss += trans_loss.item()
+            
+    return total_loss / len(test_dataloader), total_rot_loss / len(test_dataloader), total_trans_loss / len(test_dataloader)
     
 # ----------------------------
 # Main Function to Set Up and Run Training
