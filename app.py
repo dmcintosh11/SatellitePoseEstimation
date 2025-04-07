@@ -7,6 +7,7 @@ import tempfile        # For temporary files
 import base64          # For encoding mesh data
 import glob            # For finding the output mesh file
 import shutil          # For cleaning up directories
+import sys             # To get current python executable
 
 # Import the prediction function and the new drawing function
 from inference import predict_pose, loaded_model
@@ -22,6 +23,10 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16 MB limit
 
 # Ensure the upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Get the path of the current Python executable
+PYTHON_EXECUTABLE = sys.executable
+print(f"Using Python executable for subprocess: {PYTHON_EXECUTABLE}")
 
 # Path to the stable-fast-3d run.py script
 # IMPORTANT: Update this path to the correct location on your system!
@@ -90,19 +95,19 @@ def handle_prediction():
                 sf3d_output_dir = os.path.join(temp_dir, 'sf3d_output')
                 os.makedirs(sf3d_output_dir, exist_ok=True)
                 
-                # Construct command. Add any other desired SF3D args here.
+                # Construct command using the specific python executable
                 command = [
-                    'python', 
+                    PYTHON_EXECUTABLE, # Use the full path 
                     SF3D_RUN_SCRIPT, 
                     temp_image_path, 
                     '--output-dir', sf3d_output_dir
-                    # Add e.g. '--texture-resolution', '1024' if needed
                 ]
                 
                 # Execute the command
                 try:
-                    # Capture output for debugging, set timeout? 
-                    result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=300) # 5 min timeout 
+                    # Pass current environment variables to subprocess
+                    current_env = os.environ.copy()
+                    result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=300, env=current_env)
                     print("SF3D stdout:", result.stdout)
                     print("SF3D stderr:", result.stderr)
                     print("Stable Fast 3D completed.")
