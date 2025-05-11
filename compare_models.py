@@ -71,7 +71,7 @@ def main():
         print("Error: No performance data loaded. Exiting.")
         return
     
-    metrics = ['test_total_loss', 'train_total_loss']
+    metrics = ['test_total_loss', 'best_val_model_train_loss']
 
     # Plot each specified metric
     for metric_key in metrics:
@@ -80,7 +80,12 @@ def main():
         for i, data in enumerate(all_performance_data):
             if metric_key in data:
                 metric_values.append(data[metric_key])
-                current_model_names_for_metric.append(model_display_names[i]) 
+                if metric_key == 'best_val_model_train_loss':
+                    current_model_names_for_metric.append("Train Loss") 
+                elif metric_key == 'test_total_loss':
+                    current_model_names_for_metric.append("Test Loss")
+                else:
+                    current_model_names_for_metric.append(model_display_names[i]) 
             else:
                 print(f"Warning: Metric '{metric_key}' not found for model in {args.model_dirs[i]}. Skipping this model for this metric.")
         
