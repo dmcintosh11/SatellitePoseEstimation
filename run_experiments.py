@@ -4,15 +4,15 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="Run multiple training experiments for PoseNet.")
-    parser.add_argument("--base-output-dir", type=str, default="./experiment_results")
+    parser.add_argument("--base-output-dir", type=str, default="../experiment_results")
     args = parser.parse_args()
 
     # Training parameters
-    annotation_file = '../speed/train.json'
-    img_dir = '../speed/images/train/'
+    annotation_file = '../speed/speed/train.json'
+    img_dir = '../speed/speed/images/train/'
     val_split_ratio = 0.2
-    test_annotation_file = '../speed/lightbox/test.json'
-    test_img_dir = '../speed/lightbox/images/'
+    test_annotation_file = '../speed/speed/lightbox/test.json'
+    test_img_dir = '../speed/speed/lightbox/images/'
     lr = 1e-4
     beta_loss = 50.0
     batch_size = 64
