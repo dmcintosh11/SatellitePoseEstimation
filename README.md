@@ -45,9 +45,8 @@ After running the experiments, use `compare_models.py` to generate bar plots com
 **Example:**
 
 ```bash
-python compare_models.py \
-    --model-dirs ./all_experiment_runs/MyPaperExp_1_EffNet_NoFreeze ./all_experiment_runs/MyPaperExp_2_EffNet_Freeze ./all_experiment_runs/MyPaperExp_3_ResNet34_NoFreeze ./all_experiment_runs/MyPaperExp_4_ResNet34_Freeze \
-    --output-plot-dir ./plots
+python compare_models.py --model-dirs ../experiment_results/EffNet_Freeze ../experiment_results/EffNet_NoFreeze ../experiment_results/ResNet34_Freeze ../experiment_results/ResNet34_NoFreeze
+    --output-plot-dir ../plots
 ```
 ## Visual Inference Demo with 3D Model Deployment
 
