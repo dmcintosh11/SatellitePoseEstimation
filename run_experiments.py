@@ -30,6 +30,9 @@ def main():
     for i, exp_config in enumerate(experiments):
         model_name = f"{exp_config['name_suffix']}"
         freeze_flag_str = "True" if exp_config["freeze"] == True else "False"
+        
+        print(f"Freeze Flag: {freeze_flag_str}")
+        print(f"Config freeze flag: {exp_config['freeze']}")
 
         command = [
             "python", "train.py",
