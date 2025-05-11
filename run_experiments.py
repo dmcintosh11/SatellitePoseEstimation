@@ -37,7 +37,6 @@ def main():
         command = [
             "python", "train.py",
             "--architecture", exp_config["arch"],
-            "--freeze-early-backbone-layers", freeze_flag_str,
             "--model-name", model_name,
             "--output-model-path", args.base_output_dir,
             "--annotation-file", annotation_file,
@@ -51,6 +50,9 @@ def main():
             "--num-epochs", str(num_epochs),
             "--num-workers", str(num_workers)
         ]
+        
+        if exp_config["freeze"]:
+            command.append("--freeze-early-backbone-layers")
 
         print(f"\n--- Starting Experiment {i+1}/{len(experiments)}: {model_name} ---")
         print(f"Command: {' '.join(command)}")
