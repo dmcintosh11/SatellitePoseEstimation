@@ -35,8 +35,12 @@ class SpeedDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         # Convert the quaternion and translation values to tensors
-        q = torch.tensor(ann['q_vbs2tango_true'], dtype=torch.float32) #quaternion
-        t = torch.tensor(ann['r_Vo2To_vbs_true'], dtype=torch.float32) #translation
+        try:
+            q = torch.tensor(ann['q_vbs2tango_true'], dtype=torch.float32) #quaternion
+            t = torch.tensor(ann['r_Vo2To_vbs_true'], dtype=torch.float32) #translation
+        except:
+            q = torch.tensor(ann['q_vbs2tango'], dtype=torch.float32) #quaternion
+            t = torch.tensor(ann['r_Vo2To_vbs_true'], dtype=torch.float32) #translation
         return image, q, t
 
 # Loss Function (Normalized Geodesic Distance for rotation, relative translation error for translation since satellite distance can vary greatly between samples)
