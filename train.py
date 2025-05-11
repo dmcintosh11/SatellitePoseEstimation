@@ -381,8 +381,10 @@ if __name__ == '__main__':
     parser.add_argument('--num-epochs', type=int, default=10)
     parser.add_argument('--num-workers', type=int, default=8)
     parser.add_argument('--architecture', type=str, default='efficientnet_v2_s', choices=['efficientnet_v2_s', 'resnet34'])
-    parser.add_argument('--freeze-early-backbone-layers', type=bool, default=False)
+    parser.add_argument('--freeze-early-backbone-layers', action='store_true')
     parser.add_argument('--seed', type=int, default=42)
+    
+    parser.set_defaults(freeze_early_backbone_layers=False)
 
     args = parser.parse_args()
     main(args)
