@@ -3,19 +3,20 @@ import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image
 import io
-import os # Added for model path flexibility
+import os
 
 # Import the PoseNet model definition
 from model import PoseNet 
 
-# ----------------------------
-# Inference Setup
-# ----------------------------
 # Use environment variable for model path, default to 'posenet_speed.pth'
 MODEL_PATH = os.environ.get('MODEL_PATH', '../models/posenet_speed_run_EN.pth')
+# Use environment variable for architecture, default to 'efficientnet_v2_s'
+# Ensure this matches the architecture of the loaded MODEL_PATH
+MODEL_ARCHITECTURE = os.environ.get('MODEL_ARCHITECTURE', 'efficientnet_v2_s') 
+
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# Preprocessing transform for inference (should match test transform from training)
+# Preprocessing transform for inference
 preprocess = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -24,35 +25,32 @@ preprocess = transforms.Compose([
 ])
 
 # Load the trained model
-def load_model(model_path=MODEL_PATH):
+def load_model(model_path=MODEL_PATH, architecture=MODEL_ARCHITECTURE):
     if not os.path.exists(model_path):
         print(f"Error: Model weights file not found at {model_path}")
-        print("Please ensure the trained model file is present or set the MODEL_PATH environment variable.")
         return None
         
-    print(f"Loading model from {model_path} for device: {DEVICE}")
+    print(f"Loading model from {model_path} for device: {DEVICE} (Arch: {architecture})")
     try:
-        # Initialize model architecture using the imported class.
-        # Set pretrained=False as we're loading a state dict, not ImageNet weights here.
-        model = PoseNet(pretrained=False, freeze_early_layers=False)
+        model = PoseNet(
+            architecture=architecture,
+            pretrained=False
+        )
         
         # Load the saved state dictionary
-        # Use map_location to ensure compatibility if trained on GPU but inferring on CPU
         model.load_state_dict(torch.load(model_path, map_location=DEVICE))
         model.to(DEVICE)
-        model.eval() # Set model to evaluation mode
+        model.eval() 
         print("Model loaded successfully.")
         return model
     except Exception as e:
         print(f"Error loading model: {e}")
         return None
 
-# Global model variable (load once when script is imported/run)
+# Global model variable (load once when script is imported/run for app.py)
 loaded_model = load_model()
 
-# ----------------------------
-# Prediction Function
-# ----------------------------
+# Runs image through model
 def predict_pose(image_bytes):
     """
     Takes image bytes, preprocesses the image, runs inference,
@@ -79,31 +77,4 @@ def predict_pose(image_bytes):
 
     except Exception as e:
         print(f"Error during prediction: {e}")
-        # Potentially log the error in a real application
         return None, None
-
-if __name__ == '__main__':
-    # Example usage: Load an image and predict
-    # Replace 'path/to/your/test_image.png' with an actual image path
-    # Make sure posenet_speed.pth (or path set by MODEL_PATH env var) exists
-    example_image_path = 'example_image.png' # Placeholder path
-    if not os.path.exists(example_image_path):
-         print(f"Example image '{example_image_path}' not found. Skipping example prediction.")
-    elif loaded_model is None:
-        print("Model could not be loaded. Skipping example prediction.")
-    else:
-        try:
-            with open(example_image_path, 'rb') as f:
-                img_bytes = f.read()
-
-            print("\nRunning example prediction...")
-            q, t = predict_pose(img_bytes)
-
-            if q and t:
-                print(f"Predicted Quaternion (q_vbs2tango): {q}")
-                print(f"Predicted Translation (r_Vo2To_vbs): {t}")
-            else:
-                print("Prediction failed.")
-
-        except Exception as e:
-            print(f"An error occurred during example run: {e}")

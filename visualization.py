@@ -5,35 +5,13 @@ from PIL import Image
 import io
 import base64
 
-# Assumed Camera Intrinsics (Modify if true values become available)
-IMG_WIDTH = 224
-IMG_HEIGHT = 224
-# Assume focal length is roughly image dimension and principal point is center
-FX = 224.0
-FY = 224.0
-CX = IMG_WIDTH / 2.0
-CY = IMG_HEIGHT / 2.0
-CAMERA_MATRIX = np.array([
-    [FX, 0, CX],
-    [0, FY, CY],
-    [0, 0, 1]
-], dtype=np.float32)
-
-# No distortion assumed
-DIST_COEFFS = np.zeros((4, 1)) 
-
-# Length of the axes to draw (adjust for visual scale)
-# Increase significantly for better visibility
-AXIS_LENGTH = 0.5 # Example: Increased from 0.1 to 0.5
-
 def draw_pose_axes(image_bytes, quaternion, translation):
     """
     Draws 3D coordinate axes on the image based on the predicted pose.
 
     Args:
         image_bytes: Input image as bytes.
-        quaternion: Predicted quaternion [w, x, y, z] or [x, y, z, w].
-                    scipy expects [x, y, z, w]. Ensure correct order.
+        quaternion: Predicted quaternion [w, x, y, z]
         translation: Predicted translation vector [tx, ty, tz].
 
     Returns:
@@ -47,13 +25,9 @@ def draw_pose_axes(image_bytes, quaternion, translation):
             print("Error: Could not decode image.")
             return None
 
-        # Resize image if it's not the expected size (important for assumed intrinsics)
-        # Use the actual camera intrinsics provided now
-        # if img.shape[1] != IMG_WIDTH or img.shape[0] != IMG_HEIGHT:
-        #      img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
-        # Keep original size for projection with correct intrinsics
 
-        # --- Use Provided Camera Intrinsics --- 
+
+        # --- Use Provided Camera Intrinsics from SPEED --- 
         fx = 2988.5795163815555
         fy = 2988.3401159176124
         ccx = 960
@@ -71,18 +45,14 @@ def draw_pose_axes(image_bytes, quaternion, translation):
             -0.00021404771667484594,
             -0.13124227429077406
         ], dtype=np.float32)
-        # --- End Intrinsics ---
 
 
         # Ensure inputs are numpy arrays
         translation_vector = np.array(translation, dtype=np.float32).reshape(3, 1)
         quat = np.array(quaternion, dtype=np.float32)
 
-        # Ensure quaternion is in [x, y, z, w] format for SciPy
-        # Assuming input is [w, x, y, z] from the model
+
         quat_xyzw = np.array([quat[1], quat[2], quat[3], quat[0]])
-        # If model output is already [x, y, z, w]:
-        # quat_xyzw = quat
 
         # Handle potential zero quaternion
         if np.all(quat_xyzw == 0):
@@ -113,9 +83,9 @@ def draw_pose_axes(image_bytes, quaternion, translation):
         # Define 3D points for the axes origin and endpoints
         axis_points_3d = np.float32([
             [0, 0, 0],         # Origin
-            [AXIS_LENGTH, 0, 0], # X-axis end
-            [0, AXIS_LENGTH, 0], # Y-axis end
-            [0, 0, AXIS_LENGTH]  # Z-axis end
+            [0.5, 0, 0], # X-axis end
+            [0, 0.5, 0], # Y-axis end
+            [0, 0, 0.5]  # Z-axis end
         ]).reshape(-1, 3)
 
         # Project 3D points to 2D image plane using actual intrinsics
@@ -144,10 +114,9 @@ def draw_pose_axes(image_bytes, quaternion, translation):
              img_base64 = base64.b64encode(buffer).decode('utf-8')
              return img_base64
 
-        # Increase line thickness and use arrowed lines
-        line_thickness = 3 # Increased thickness
-        tip_length = 0.15  # Relative length of the arrowhead
 
+        line_thickness = 3
+        tip_length = 0.15 
         # Draw lines with arrow heads (BGR colors)
         cv2.arrowedLine(img, origin, x_axis_end, (0, 0, 255), line_thickness, tipLength=tip_length) # X = Red
         cv2.arrowedLine(img, origin, y_axis_end, (0, 255, 0), line_thickness, tipLength=tip_length) # Y = Green
@@ -163,15 +132,5 @@ def draw_pose_axes(image_bytes, quaternion, translation):
         print(f"Error drawing pose axes: {e}")
         import traceback
         traceback.print_exc()
-        # Fallback to original image
-        try:
-             img_np = np.frombuffer(image_bytes, np.uint8)
-             img = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
-             if img is not None:
-                 _, buffer = cv2.imencode('.png', img)
-                 img_base64 = base64.b64encode(buffer).decode('utf-8')
-                 return img_base64
-        except Exception as fallback_e:
-             print(f"Error during fallback image encoding: {fallback_e}")
 
         return None # Indicate failure
