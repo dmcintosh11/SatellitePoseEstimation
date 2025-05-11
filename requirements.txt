@@ -7,6 +7,7 @@ requests>=2.31 # Resolve jupyterlab-server conflict
 #numpy             # For numerical operations
 scipy             # For rotation conversions
 opencv-python-headless # For image processing/drawing (no GUI)
+matplotlib
 
 einops==0.7.0
 jaxtyping==0.2.31
