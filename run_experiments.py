@@ -27,13 +27,12 @@ def main():
         {"arch": "resnet34",          "freeze": False, "name_suffix": "ResNet34_NoFreeze"},
         {"arch": "resnet34",          "freeze": True,  "name_suffix": "ResNet34_Freeze"},
     ]
-
     for i, exp_config in enumerate(experiments):
         model_name = f"{exp_config['name_suffix']}"
         freeze_flag_str = "True" if exp_config["freeze"] else "False"
 
         command = [
-            "python train.py",
+            "python", "train.py",
             "--architecture", exp_config["arch"],
             "--freeze-early-backbone-layers", freeze_flag_str,
             "--model-name", model_name,
