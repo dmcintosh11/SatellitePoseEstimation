@@ -228,7 +228,7 @@ def main(args):
 
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+    print(f"Using device: {device} with freezed early backbone layers: {args.freeze_early_backbone_layers}")
     
     # Define output directories
     model_specific_output_dir = os.path.join(args.output_model_path, args.model_name) 
