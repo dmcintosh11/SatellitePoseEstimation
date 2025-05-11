@@ -8,6 +8,7 @@ requests>=2.31 # Resolve jupyterlab-server conflict
 scipy             # For rotation conversions
 opencv-python-headless # For image processing/drawing (no GUI)
 matplotlib
+scikit-learn
 
 einops==0.7.0
 jaxtyping==0.2.31

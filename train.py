@@ -359,15 +359,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train PoseNet model with Train/Validation/Test splits.')
 
     # Data arguments
-    parser.add_argument('--annotation-file', type=str, default='../speed/train.json')
-    parser.add_argument('--img-dir', type=str, default='../speed/images/train/')
+    parser.add_argument('--annotation-file', type=str, default='../speed/speed/train.json')
+    parser.add_argument('--img-dir', type=str, default='../speed/speed/images/train/')
     parser.add_argument('--val-split-ratio', type=float, default=0.2)
     
-    parser.add_argument('--test-annotation-file', type=str, default='../speed/lightbox/test.json')
-    parser.add_argument('--test-img-dir', type=str, default='../speed/lightbox/images/')
+    parser.add_argument('--test-annotation-file', type=str, default='../speed/speed/lightbox/test.json')
+    parser.add_argument('--test-img-dir', type=str, default='../speed/speed/lightbox/images/')
 
     # Model output argument
-    parser.add_argument('--output-model-path', type=str, default='trained_models')
+    parser.add_argument('--output-model-path', type=str, default='../trained_models')
     parser.add_argument('--model-name', type=str, default='PoseNet_EfficientNet')
 
     # Training hyperparameters
