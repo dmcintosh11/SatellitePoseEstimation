@@ -9,6 +9,7 @@ class PoseNet(nn.Module):
         super(PoseNet, self).__init__()
         self.architecture = architecture
         self.freeze_early_backbone_layers = freeze_early_backbone_layers
+        print(f"POSENET: Architecture: {self.architecture}, Freeze Early Backbone Layers: {self.freeze_early_backbone_layers}")
 
         if self.architecture == 'efficientnet_v2_s':
             effnet_weights = EfficientNet_V2_S_Weights.DEFAULT if pretrained else None
