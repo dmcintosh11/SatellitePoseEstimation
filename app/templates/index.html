@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite Pose Estimation & 3D Model</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Load Model Viewer script -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Satellite Pose Estimator & 3D Reconstruction</h1>
+        <p>Upload an image or select an example to predict its pose and generate a 3D mesh.</p>
+
+        <div class="input-selection">
+            <div class="upload-section">
+                <label for="fileInput" class="file-label">Choose Satellite Image</label>
+                <input type="file" id="fileInput" accept="image/png, image/jpeg, image/jpg">
+            </div>
+
+            <div class="or-divider">OR</div>
+
+            <div class="example-section">
+                <label for="exampleSelect">Select Example:</label>
+                <select id="exampleSelect">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="predict-action">
+            <button id="predictButton" disabled>Predict Pose & Generate Mesh</button>
+        </div>
+
+        <div id="status" class="status-message"></div>
+
+        <div class="results-area">
+            <div class="image-display-area">
+                <div class="image-preview-container">
+                    <h2>Input Image:</h2>
+                    <img id="imagePreview" src="#" alt="Input image preview" style="display: none;">
+                </div>
+                <div class="visualization-container">
+                    <h2>Pose Visualization:</h2>
+                    <img id="visualizationImage" src="#" alt="Pose visualization on image" style="display: none;">
+                </div>
+            </div>
+
+            <div class="prediction-container">
+                <h2>Generated 3D Model & Predicted Pose:</h2>
+                <div id="predictionResult" class="prediction-result">
+                    <model-viewer id="modelViewer" 
+                                  src=""
+                                  alt="Generated 3D model of the satellite"
+                                  camera-controls
+                                  style="display: none; width: 100%; height: 300px; background-color: #eee; border-radius: 5px;"
+                                  ar
+                                  ar-modes="webxr scene-viewer quick-look">
+                        <div slot="progress-bar"></div>
+                    </model-viewer>
+                </div>
+                <div id="poseInfo" class="pose-info" style="margin-top: 15px; font-family: monospace; font-size: 0.9em;">
+                    <!-- Pose info will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
