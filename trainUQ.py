@@ -9,6 +9,7 @@ import os
 import argparse
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 # Import the PoseNet model definition
 from modelUQ import PoseNet
@@ -78,7 +79,10 @@ def train(model, train_dataloader, optimizer, device, beta_loss):
     total_loss = 0.0
     total_rot_loss = 0.0
     total_trans_loss = 0.0
-    for images, true_rot, true_trans in train_dataloader:
+    
+    # Add progress bar for training
+    pbar = tqdm(train_dataloader, desc='Training', leave=False)
+    for images, true_rot, true_trans in pbar:
         images = images.to(device)
         true_rot = true_rot.to(device)
         true_trans = true_trans.to(device)
@@ -96,11 +100,13 @@ def train(model, train_dataloader, optimizer, device, beta_loss):
         total_rot_loss += rot_loss.item()
         total_trans_loss += trans_loss.item()
         
+        # Update progress bar with current loss
+        pbar.set_postfix({'loss': f'{loss.item():.4f}'})
+        
     return total_loss / len(train_dataloader), total_rot_loss / len(train_dataloader), total_trans_loss / len(train_dataloader)
 
 #Computes loss on validation set during training to monitor progress
 def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
-    
     # Activate dropout layers for MC sampling
     for module in model.modules():
         if isinstance(module, nn.Dropout):
@@ -110,42 +116,59 @@ def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
     total_rot_loss = 0.0
     total_trans_loss = 0.0
 
-    # To store all MC predictions from all batches for overall variance calculation
-    all_batches_mc_pred_rots = [] # List of tensors of shape (num_mc_samples, batch_size, 4)
-    all_batches_mc_pred_trans = []# List of tensors of shape (num_mc_samples, batch_size, 3)
+    # Initialize running sums for variance calculation
+    sum_rot = torch.zeros(4, device=device)  # q0, q1, q2, q3
+    sum_rot_sq = torch.zeros(4, device=device)
+    sum_trans = torch.zeros(3, device=device)  # x, y, z
+    sum_trans_sq = torch.zeros(3, device=device)
+    total_samples = 0
 
     with torch.no_grad():
-        for images, true_rot, true_trans in val_dataloader:
-            print("\tRunning validation step...")
+        pbar = tqdm(val_dataloader, desc='Validation', leave=False)
+        for images, true_rot, true_trans in pbar:
             images = images.to(device)
             true_rot = true_rot.to(device)
             true_trans = true_trans.to(device)
             
-            batch_mc_pred_rots_samples = []
-            batch_mc_pred_trans_samples = []
+            batch_size = images.size(0)
+            total_samples += batch_size
 
             if num_mc_samples > 1:
-                for _ in range(num_mc_samples):
-                    print("\tRunning MC sample...")
+                # Initialize batch accumulators on GPU
+                batch_sum_rot = torch.zeros((batch_size, 4), device=device)
+                batch_sum_rot_sq = torch.zeros((batch_size, 4), device=device)
+                batch_sum_trans = torch.zeros((batch_size, 3), device=device)
+                batch_sum_trans_sq = torch.zeros((batch_size, 3), device=device)
+
+                # Run MC samples
+                mc_pbar = tqdm(range(num_mc_samples), desc='MC Samples', leave=False)
+                for _ in mc_pbar:
                     pred_rot_sample, pred_trans_sample = model(images)
-                    batch_mc_pred_rots_samples.append(pred_rot_sample)
-                    batch_mc_pred_trans_samples.append(pred_trans_sample)
-                
-                # Stack samples for current batch: (num_mc_samples, batch_size, dim)
-                current_batch_stacked_rots = torch.stack(batch_mc_pred_rots_samples)
-                current_batch_stacked_trans = torch.stack(batch_mc_pred_trans_samples)
+                    
+                    # Accumulate sums and squared sums for variance calculation
+                    batch_sum_rot += pred_rot_sample
+                    batch_sum_rot_sq += pred_rot_sample ** 2
+                    batch_sum_trans += pred_trans_sample
+                    batch_sum_trans_sq += pred_trans_sample ** 2
 
-                all_batches_mc_pred_rots.append(current_batch_stacked_rots.cpu()) # Move to CPU to save GPU mem
-                all_batches_mc_pred_trans.append(current_batch_stacked_trans.cpu())
+                # Calculate means for this batch
+                mean_pred_rot = batch_sum_rot / num_mc_samples
+                mean_pred_trans = batch_sum_trans / num_mc_samples
 
-                mean_pred_rot = torch.mean(current_batch_stacked_rots, dim=0)
+                # Normalize quaternion
                 mean_pred_rot = mean_pred_rot / (torch.norm(mean_pred_rot, p=2, dim=1, keepdim=True) + 1e-8)
-                mean_pred_trans = torch.mean(current_batch_stacked_trans, dim=0)
+
+                # Calculate batch variances
+                batch_var_rot = (batch_sum_rot_sq / num_mc_samples) - (mean_pred_rot ** 2)
+                batch_var_trans = (batch_sum_trans_sq / num_mc_samples) - (mean_pred_trans ** 2)
+
+                # Accumulate global statistics
+                sum_rot += batch_var_rot.sum(dim=0)
+                sum_trans += batch_var_trans.sum(dim=0)
+
             else:
                 mean_pred_rot, mean_pred_trans = model(images)
-                # To make downstream variance calculation consistent if num_mc_samples=1
-                all_batches_mc_pred_rots.append(mean_pred_rot.cpu().unsqueeze(0))
-                all_batches_mc_pred_trans.append(mean_pred_trans.cpu().unsqueeze(0))
+                mean_pred_rot = mean_pred_rot / (torch.norm(mean_pred_rot, p=2, dim=1, keepdim=True) + 1e-8)
             
             rot_loss, trans_loss = pose_loss(mean_pred_rot, mean_pred_trans, true_rot, true_trans, beta=beta_loss)
             loss = rot_loss + beta_loss * trans_loss
@@ -153,26 +176,14 @@ def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
             total_loss += loss.item()
             total_rot_loss += rot_loss.item()
             total_trans_loss += trans_loss.item()
+            
+            pbar.set_postfix({'loss': f'{loss.item():.4f}'})
 
-    print("\tValidation step done...")
+    # Calculate final average variances
+    avg_val_rot_variances = (sum_rot / total_samples).cpu()
+    avg_val_trans_variances = (sum_trans / total_samples).cpu()
 
-    # Calculate average component-wise variances across all validation samples
-    avg_val_rot_variances = torch.zeros(4, device='cpu') # q0, q1, q2, q3
-    avg_val_trans_variances = torch.zeros(3, device='cpu') # x, y, z
-
-    if num_mc_samples > 1 and len(all_batches_mc_pred_rots) > 0:
-        # Concatenate all batches: (num_mc_samples, total_val_samples, dim)
-        full_val_mc_rots = torch.cat(all_batches_mc_pred_rots, dim=1)
-        full_val_mc_trans = torch.cat(all_batches_mc_pred_trans, dim=1)
-
-        # Variance across MC samples for each val sample: (total_val_samples, dim)
-        var_val_rot_per_sample = torch.var(full_val_mc_rots, dim=0)
-        var_val_trans_per_sample = torch.var(full_val_mc_trans, dim=0)
-
-        # Average variance across all val samples for each component
-        avg_val_rot_variances = torch.mean(var_val_rot_per_sample, dim=0) # Shape: (4)
-        avg_val_trans_variances = torch.mean(var_val_trans_per_sample, dim=0) # Shape: (3)
-
+    # Reset dropout layers to eval mode
     for module in model.modules():
         if isinstance(module, nn.Dropout):
             module.eval()
@@ -180,7 +191,7 @@ def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
     return (total_loss / len(val_dataloader), 
             total_rot_loss / len(val_dataloader), 
             total_trans_loss / len(val_dataloader),
-            avg_val_rot_variances, # Return avg variances
+            avg_val_rot_variances,
             avg_val_trans_variances)
     
 
@@ -273,7 +284,6 @@ def evaluate_on_final_test_set(best_model_path, test_annotation_file, test_img_d
     except Exception as e:
         print(f"Error loading model from {best_model_path} for final test evaluation: {e}")
         return
-    # model.eval() # Original eval mode
 
     # Activate dropout layers for MC sampling
     for module in model.modules():
@@ -282,77 +292,79 @@ def evaluate_on_final_test_set(best_model_path, test_annotation_file, test_img_d
 
     total_loss, total_rot_loss, total_trans_loss = 0.0, 0.0, 0.0
     
-    # Store all MC samples for calculating mean and variance
-    all_mc_pred_rots_stacked = []
-    all_mc_pred_trans_stacked = []
+    # Initialize running sums for variance calculation
+    sum_rot = torch.zeros(4, device=device)  # q0, q1, q2, q3
+    sum_rot_sq = torch.zeros(4, device=device)
+    sum_trans = torch.zeros(3, device=device)  # x, y, z
+    sum_trans_sq = torch.zeros(3, device=device)
+    total_samples = 0
 
     with torch.no_grad():
-        for images, true_rot, true_trans in true_test_dataloader:
+        pbar = tqdm(true_test_dataloader, desc='Testing', leave=True)
+        for images, true_rot, true_trans in pbar:
             images, true_rot, true_trans = images.to(device), true_rot.to(device), true_trans.to(device)
             
-            batch_mc_pred_rots = []
-            batch_mc_pred_trans = []
+            batch_size = images.size(0)
+            total_samples += batch_size
 
             if num_mc_samples > 1:
-                for _ in range(num_mc_samples):
+                # Initialize batch accumulators on GPU
+                batch_sum_rot = torch.zeros((batch_size, 4), device=device)
+                batch_sum_rot_sq = torch.zeros((batch_size, 4), device=device)
+                batch_sum_trans = torch.zeros((batch_size, 3), device=device)
+                batch_sum_trans_sq = torch.zeros((batch_size, 3), device=device)
+
+                # Run MC samples
+                mc_pbar = tqdm(range(num_mc_samples), desc='MC Samples', leave=False)
+                for _ in mc_pbar:
                     pred_rot_sample, pred_trans_sample = model(images)
-                    batch_mc_pred_rots.append(pred_rot_sample.cpu()) # Move to CPU to save GPU memory if accumulating many
-                    batch_mc_pred_trans.append(pred_trans_sample.cpu())
-                
-                # Stack samples for this batch: (num_mc_samples, batch_size, dim)
-                current_batch_rots_stacked = torch.stack(batch_mc_pred_rots)
-                current_batch_trans_stacked = torch.stack(batch_mc_pred_trans)
-                
-                all_mc_pred_rots_stacked.append(current_batch_rots_stacked)
-                all_mc_pred_trans_stacked.append(current_batch_trans_stacked)
+                    
+                    # Accumulate sums and squared sums for variance calculation
+                    batch_sum_rot += pred_rot_sample
+                    batch_sum_rot_sq += pred_rot_sample ** 2
+                    batch_sum_trans += pred_trans_sample
+                    batch_sum_trans_sq += pred_trans_sample ** 2
 
-                # Calculate mean predictions for loss calculation for this batch
-                mean_pred_rot_batch = torch.mean(current_batch_rots_stacked, dim=0)
-                mean_pred_rot_batch = mean_pred_rot_batch / (torch.norm(mean_pred_rot_batch, p=2, dim=1, keepdim=True) + 1e-8)
-                mean_pred_trans_batch = torch.mean(current_batch_trans_stacked, dim=0)
-                
-                # Loss for this batch is based on mean prediction
-                rot_loss, trans_loss = pose_loss(mean_pred_rot_batch.to(device), mean_pred_trans_batch.to(device), true_rot, true_trans, beta=beta_loss)
+                # Calculate means for this batch
+                mean_pred_rot = batch_sum_rot / num_mc_samples
+                mean_pred_trans = batch_sum_trans / num_mc_samples
 
-            else: # Standard evaluation if num_mc_samples is 1
-                mean_pred_rot_batch, mean_pred_trans_batch = model(images) # Already on device
-                # Store them as if they were MC samples for consistency in loss calculation
-                all_mc_pred_rots_stacked.append(mean_pred_rot_batch.cpu().unsqueeze(0)) # Add sample dim
-                all_mc_pred_trans_stacked.append(mean_pred_trans_batch.cpu().unsqueeze(0)) # Add sample dim
-                rot_loss, trans_loss = pose_loss(mean_pred_rot_batch, mean_pred_trans_batch, true_rot, true_trans, beta=beta_loss)
+                # Normalize quaternion
+                mean_pred_rot = mean_pred_rot / (torch.norm(mean_pred_rot, p=2, dim=1, keepdim=True) + 1e-8)
 
+                # Calculate batch variances
+                batch_var_rot = (batch_sum_rot_sq / num_mc_samples) - (mean_pred_rot ** 2)
+                batch_var_trans = (batch_sum_trans_sq / num_mc_samples) - (mean_pred_trans ** 2)
+
+                # Accumulate global statistics
+                sum_rot += batch_var_rot.sum(dim=0)
+                sum_trans += batch_var_trans.sum(dim=0)
+
+            else:
+                mean_pred_rot, mean_pred_trans = model(images)
+                mean_pred_rot = mean_pred_rot / (torch.norm(mean_pred_rot, p=2, dim=1, keepdim=True) + 1e-8)
+            
+            rot_loss, trans_loss = pose_loss(mean_pred_rot, mean_pred_trans, true_rot, true_trans, beta=beta_loss)
             loss = rot_loss + beta_loss * trans_loss
+            
             total_loss += loss.item()
             total_rot_loss += rot_loss.item()
             total_trans_loss += trans_loss.item()
-    
-    avg_total_loss = total_loss / len(true_test_dataloader)
-    avg_rot_loss = total_rot_loss / len(true_test_dataloader)
-    avg_trans_loss = total_trans_loss / len(true_test_dataloader)
+            
+            pbar.set_postfix({'loss': f'{loss.item():.4f}'})
 
-    # Concatenate all batch MC results: (num_mc_samples, total_test_samples, dim)
-    final_all_mc_pred_rots = torch.cat(all_mc_pred_rots_stacked, dim=1)
-    final_all_mc_pred_trans = torch.cat(all_mc_pred_trans_stacked, dim=1)
-
-    # Calculate overall mean predictions (across all test samples and MC samples)
-    # This is for reporting the final "best guess" pose
-    overall_mean_pred_rot = torch.mean(final_all_mc_pred_rots, dim=0)
-    overall_mean_pred_rot = overall_mean_pred_rot / (torch.norm(overall_mean_pred_rot, p=2, dim=1, keepdim=True) + 1e-8)
-    overall_mean_pred_trans = torch.mean(final_all_mc_pred_trans, dim=0)
-
-    # Calculate variance across MC samples for each test sample, then average these variances
-    # Variance: (total_test_samples, dim)
-    var_pred_rot_per_sample = torch.var(final_all_mc_pred_rots, dim=0)
-    var_pred_trans_per_sample = torch.var(final_all_mc_pred_trans, dim=0)
-
-    # Average variance across all test samples for each component
-    avg_var_pred_rot = torch.mean(var_pred_rot_per_sample, dim=0) # Shape: (4)
-    avg_var_pred_trans = torch.mean(var_pred_trans_per_sample, dim=0) # Shape: (3)
+    # Calculate final average variances
+    avg_var_pred_rot = (sum_rot / total_samples).cpu()
+    avg_var_pred_trans = (sum_trans / total_samples).cpu()
     
     # Set model back to eval mode
     for module in model.modules():
         if isinstance(module, nn.Dropout):
             module.eval()
+
+    avg_total_loss = total_loss / len(true_test_dataloader)
+    avg_rot_loss = total_rot_loss / len(true_test_dataloader)
+    avg_trans_loss = total_trans_loss / len(true_test_dataloader)
 
     print(f"--- Final Test Set Performance for {model_name} (MC Samples: {num_mc_samples}) ---")
     print(f"Test Total Loss: {avg_total_loss:.4f}")
