@@ -5,6 +5,8 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(description="Run multiple training experiments for PoseNet.")
     parser.add_argument("--base-output-dir", type=str, default="../experiment_results")
+    parser.add_argument("--UQ", action='store_true')
+    parser.set_defaults(UQ=False)
     args = parser.parse_args()
 
     # Training parameters
@@ -35,7 +37,7 @@ def main():
         print(f"Config freeze flag: {exp_config['freeze']}")
 
         command = [
-            "python", "train.py",
+            "python", "trainUQ.py" if args.UQ else "train.py",
             "--architecture", exp_config["arch"],
             "--model-name", model_name,
             "--output-model-path", args.base_output_dir,
