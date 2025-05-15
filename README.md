@@ -6,9 +6,17 @@ This project focuses on estimating the 6-DoF pose (position and orientation) of 
 
 This project serves as a demonstration of applying computer vision and deep learning techniques to space-based applications. As an experiment I have tested different model architectures and training strategies to see how the model performs on the SPEED and SPEED+ dataset. This includes ResNet34 and EfficientNetV2-S with and without freezing early layers. The best performing model is the EfficientNetV2-S with freezing.
 
-The train and test loss of the experiment can be seen here (Loss is calculated as a weighted sum of the rotation and translation loss; train data is the synthetic dataset from SPEED and test data is the more real world lightbox dataset within the SPEED+ dataset):
+Loss is calculated as a weighted sum of the rotation and translation loss; train data is the synthetic dataset from SPEED and test data is the more real world lightbox dataset within the SPEED+ dataset. The results of the experiment can be seen below:
 
 ![Experiment Results](./docs/comparison_train_vs_test_loss.png)
+
+I have also included a UQ experiment that uses Monte Carlo Dropout to estimate the uncertainty of the pose estimation. This is done by adding a dropout layer (p=0.5) right before the final layer of the model. The dropout layer is kept active during inference and gathers 150 samples of the model's output to estimate the uncertainty of the pose estimation. The results of the UQ experiment can be seen below:
+
+![UQ Results](./docs/UQ_results.png)
+
+
+
+
 
 ## Installation
 
@@ -41,6 +49,13 @@ The `run_experiments.py` script automates training a predefined set of four mode
 ```bash
 python run_experiments.py --base-output-dir ./all_experiment_runs
 ```
+
+In order to run the UQ experiment, you can add the `--UQ` flag to the `run_experiments.py` script.
+
+```bash
+python run_experiments.py --base-output-dir ./all_experiment_runs_UQ --UQ
+```
+
 
 ### Comparing Model Performances (`compare_models.py`)
 
