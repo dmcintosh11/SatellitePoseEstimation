@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision import models
 from torchvision.models import EfficientNet_V2_S_Weights, ResNet50_Weights, ResNet34_Weights
 
-# Model Definition: Uses EfficientNetV2-S as backbone and appends quaternion and translation heads to the end of the network
+# Model Definition: Uses EfficientNetV2-S or ResNet34 as backbone and appends quaternion and translation heads to the end of the network
 class PoseNet(nn.Module):
     def __init__(self, architecture='efficientnet_v2_s', pretrained=True, freeze_early_backbone_layers=True):
         super(PoseNet, self).__init__()
@@ -54,7 +54,6 @@ class PoseNet(nn.Module):
                         param.requires_grad = False
                 print("Froze ResNet34 layers: conv1, bn1, layer1")
             
-            # Simplified head for ResNet34
             self.fc_rot = nn.Linear(num_features, 4)  # Quaternion output
             self.fc_trans = nn.Linear(num_features, 3)  # Translation output
 
@@ -63,7 +62,8 @@ class PoseNet(nn.Module):
 
     def forward(self, x):
         features = self.backbone(x)
-        # Common simple head for both architectures now
+        
+        # Send through the different heads for rotation and translation
         rot = self.fc_rot(features)
         trans = self.fc_trans(features)
 

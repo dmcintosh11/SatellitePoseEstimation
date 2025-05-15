@@ -4,7 +4,7 @@
 
 This project focuses on estimating the 6-DoF pose (position and orientation) of a satellite from synthetic imagery using computer vision. It utilizes the [SPEED+](https://zenodo.org/records/5588480) and [SPEED](https://zenodo.org/records/6327547) dataset, which contains rendered images of a satellite with corresponding ground truth pose information.
 
-This project serves as a demonstration of applying computer vision and deep learning techniques to space-based applications. As an experiment I have tested different model architectures and training strategies to see how the model performs on the SPEED and SPEED+ dataset. This includes ResNet34 and EfficientNetV2-S with and without freezing early layers. The best performing model is the EfficientNetV2-S with freezing, and has been provided in the models folder.
+This project serves as a demonstration of applying computer vision and deep learning techniques to space-based applications. As an experiment I have tested different model architectures and training strategies to see how the model performs on the SPEED and SPEED+ dataset. This includes ResNet34 and EfficientNetV2-S with and without freezing early layers. The best performing model is the EfficientNetV2-S with freezing.
 
 The train and test loss of the experiment can be seen here (Loss is calculated as a weighted sum of the rotation and translation loss; train data is the synthetic dataset from SPEED and test data is the more real world lightbox dataset within the SPEED+ dataset):
 
@@ -62,7 +62,7 @@ Example output image from the demo:
 
 Video of the demo:
 
-![Demo Video](./docs/DemoExample.mov)
+![Demo Video](./docs/DemoExample.gif)
 
 To run the demo, you must first setup huggingface cli and get access to the model weights as described in the [Stable Fast 3D Github Repo](https://github.com/Stability-AI/stable-fast-3d)
 
