@@ -599,7 +599,7 @@ if __name__ == '__main__':
     parser.add_argument('--architecture', type=str, default='efficientnet_v2_s', choices=['efficientnet_v2_s', 'resnet34'])
     parser.add_argument('--freeze-early-backbone-layers', type=bool, default=False)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--num-mc-samples', type=int, default=150)
+    parser.add_argument('--num-mc-samples', type=int, default=50)
 
     args = parser.parse_args()
     main(args)
