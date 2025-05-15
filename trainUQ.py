@@ -100,11 +100,8 @@ def train(model, train_dataloader, optimizer, device, beta_loss):
 
 #Computes loss on validation set during training to monitor progress
 def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
-    # model.eval() # Original eval mode
     
     # Activate dropout layers for MC sampling
-    # This is preferred over model.train() if you have BatchNorm layers
-    # and you want their running stats to remain frozen.
     for module in model.modules():
         if isinstance(module, nn.Dropout):
             module.train()
@@ -119,6 +116,7 @@ def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
 
     with torch.no_grad():
         for images, true_rot, true_trans in val_dataloader:
+            print("\tRunning validation step...")
             images = images.to(device)
             true_rot = true_rot.to(device)
             true_trans = true_trans.to(device)
@@ -128,6 +126,7 @@ def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
 
             if num_mc_samples > 1:
                 for _ in range(num_mc_samples):
+                    print("\tRunning MC sample...")
                     pred_rot_sample, pred_trans_sample = model(images)
                     batch_mc_pred_rots_samples.append(pred_rot_sample)
                     batch_mc_pred_trans_samples.append(pred_trans_sample)
@@ -154,6 +153,8 @@ def validate(model, val_dataloader, device, beta_loss, num_mc_samples=1):
             total_loss += loss.item()
             total_rot_loss += rot_loss.item()
             total_trans_loss += trans_loss.item()
+
+    print("\tValidation step done...")
 
     # Calculate average component-wise variances across all validation samples
     avg_val_rot_variances = torch.zeros(4, device='cpu') # q0, q1, q2, q3
@@ -492,9 +493,11 @@ def main(args):
     for epoch in range(args.num_epochs):
         print(f"Starting Epoch {epoch+1}/{args.num_epochs}...")
         train_loss, train_rot_loss, train_trans_loss = train(model, train_dataloader, optimizer, device, args.beta_loss)
+        print("\tTraining step done... running validation step...")
         val_loss, val_rot_loss, val_trans_loss, val_rot_variances, val_trans_variances = validate(
             model, val_dataloader, device, args.beta_loss, args.num_mc_samples
         )
+        print("\tValidation step done...")
         
         epoch_data['train_total_losses'].append(train_loss)
         epoch_data['train_rot_losses'].append(train_rot_loss)
