@@ -64,7 +64,23 @@ Video of the demo:
 
 ![Demo Video](./docs/DemoExample.gif)
 
-To run the demo, you must first setup huggingface cli and get access to the model weights as described in the [Stable Fast 3D Github Repo](https://github.com/Stability-AI/stable-fast-3d)
+To run the demo, you must first setup huggingface cli and get access to the model weights as described in the [Stable Fast 3D Github Repo](https://github.com/Stability-AI/stable-fast-3d). You must also install the corresponding dependencies for the demo with the following commands:
+
+Update setuptools by running:
+```bash
+pip install -U setuptools==69.5.1
+```
+
+Install wheel by running:
+```bash
+pip install wheel
+```
+
+Install the dependencies in the `stable_fast_requirements.txt` file by running:
+```bash
+
+pip install -r stable_fast_requirements.txt
+```
 
 Once you have access to the model weights, you can set the fine tuned model path in the environment variable `MODEL_PATH` and run the demo with the following command:
 
