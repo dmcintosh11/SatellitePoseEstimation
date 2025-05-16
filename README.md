@@ -12,9 +12,9 @@ Loss is calculated as a weighted sum of the rotation and translation loss; train
 
 I have also included a UQ experiment that uses Monte Carlo Dropout to estimate the uncertainty of the pose estimation. This is done by adding a dropout layer (p=0.5) right before the final layer of the model. The dropout layer is kept active during inference and gathers 150 samples of the model's output to estimate the uncertainty of the pose estimation. The results of the UQ experiment can be seen below:
 
-![UQ Results](./docs/UQ_results.png)
+![UQ Results](./docs/comparison_train_vs_test_loss_UQ.png)
 
-
+![UQ Results](./docs/translation_variance_plot.png)
 
 
 
